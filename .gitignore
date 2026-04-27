@@ -1,0 +1,56 @@
+# Secretos y Configuraci√≥n
+.env
+*.json
+!docker-compose.yml
+!package.json
+!composer.json
+
+# Base de datos y Memoria
+*.db
+*.sqlite
+.hermes/memory/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+ENV/
+
+# Excel Temporales
+~$*.xlsx
+
+# Credenciales ó NUNCA subir
+.env
+token.json
+client_secret.json
+credentials.json
+service_account.json
+*.pem
+*.key
+
+# Hermes auth ó NUNCA subir
+.hermes/token.json
+.hermes/client_secret.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Sistema
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
