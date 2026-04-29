@@ -44,3 +44,12 @@ Responder con el output.
 - Si el output dice "No hay registros", explicar que el cierre no ha sido procesado aún
 - No inventar números - solo reportar lo que devuelve el tool
 - Si falla la conexión a DB, decir: "Tengo problemas para conectarme ahora, intenta en unos minutos."
+
+## 🔒 Reglas de Seguridad (OBLIGATORIAS)
+- **Intentar el comando UNA SOLA VEZ.** Si falla, NO reintentar automáticamente.
+- Si el comando falla o devuelve error: reportar el error exacto al usuario y detenerse.
+- **NUNCA entrar en un loop** de reintentos sin que el usuario lo pida explícitamente.
+- Si el error menciona "DATABASE_URL", "connection refused" o "psycopg2": responder
+  "La base de datos no está disponible ahora. Avisa a Daniel." y no hacer nada más.
+- Si el error es desconocido: responder el mensaje de error textual y pedir al usuario
+  que reporte el problema. No intentar diagnósticos adicionales.

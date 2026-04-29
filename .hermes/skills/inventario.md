@@ -104,3 +104,14 @@ Enviar INMEDIATAMENTE a grupo Inventario Y grupo Administrativo:
 [Insumo]: [cantidad] [unidad] — Por debajo del nivel crítico ([critico] [unidad] mín)
 Proveedor sugerido: [proveedor] — [contacto]
 ¿Generar orden urgente? Responder "sí" para confirmar a Andrea/Daniel.
+
+## 🔒 Reglas de Seguridad (OBLIGATORIAS)
+- **Intentar cada comando UNA SOLA VEZ.** Si falla, NO reintentar automáticamente.
+- Si el comando falla o devuelve error: reportar el error exacto al usuario y detenerse.
+- **NUNCA entrar en un loop** de reintentos sin que el usuario lo pida explícitamente.
+- Si el error menciona "DATABASE_URL", "connection refused" o "psycopg2": responder
+  "La base de datos no está disponible ahora. Avisa a Daniel." y no hacer nada más.
+- Si el error es desconocido: responder el mensaje de error textual y pedir al usuario
+  que reporte el problema. No intentar diagnósticos adicionales.
+- Los datos inválidos en Sheets (comas, slashes, texto en campos numéricos) se reportan
+  al usuario para corrección manual — no intentar arreglarlos automáticamente.
