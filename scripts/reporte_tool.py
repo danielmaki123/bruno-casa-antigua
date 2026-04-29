@@ -324,6 +324,7 @@ def q_resumen(conn) -> str:
 
 
 def main():
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser(description="Reportes de ventas e inventario")
     parser.add_argument("--test", action="store_true", help="Probar conexión a DB y salir")
     parser.add_argument(
