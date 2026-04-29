@@ -354,7 +354,7 @@ def leer_inventario_sheet() -> list[dict[str, Any]]:
     fixed_cols = 5
     for row in values[2:]:
         producto = row[0].strip() if len(row) > 0 else ''
-        if not producto:
+        if not producto or producto.startswith('---') or producto.startswith('='):
             continue
 
         categoria = row[1].strip() if len(row) > 1 else ''
@@ -362,11 +362,12 @@ def leer_inventario_sheet() -> list[dict[str, Any]]:
         stock_min_raw = row[3] if len(row) > 3 else None
         proveedor_raw = row[4] if len(row) > 4 else None
 
+        # Ignorar filas decorativas
+        if not categoria and not unidad and not str(stock_min_raw or '').strip():
+            continue
+
         stock_min = _parse_cantidad(stock_min_raw)
-        try:
-            proveedor_id = int(str(proveedor_raw).strip()) if str(proveedor_raw).strip() else None
-        except ValueError:
-            proveedor_id = None
+        proveedor = str(proveedor_raw).strip() if proveedor_raw else None
 
         for idx in range(fixed_cols, len(headers)):
             fecha = _parse_header_date(headers[idx])
@@ -384,7 +385,7 @@ def leer_inventario_sheet() -> list[dict[str, Any]]:
                 'categoria': categoria,
                 'unidad': unidad,
                 'stock_min': stock_min,
-                'proveedor_id': proveedor_id,
+                'proveedor': proveedor,
                 'fecha': fecha,
                 'cantidad_raw': cantidad_raw,
                 'cantidad_normalizada': _parse_cantidad(cantidad_raw),
@@ -432,7 +433,7 @@ def leer_postres_sheet() -> list[dict[str, Any]]:
             'producto': producto,
             'stock_min': _parse_cantidad(row[1] if len(row) > 1 else None),
             'stock_actual': _parse_cantidad(row[2] if len(row) > 2 else None),
-            'proveedor_id': int(row[3]) if len(row) > 3 and str(row[3]).strip().isdigit() else None,
+            'proveedor': str(row[3]).strip() if len(row) > 3 and str(row[3]).strip() else None,
         })
     return out
 
@@ -501,10 +502,7 @@ def leer_entradas_sheet() -> list[dict]:
         categoria = row[1].strip() if len(row) > 1 else ''
         unidad = row[2].strip() if len(row) > 2 else ''
         proveedor_raw = row[3] if len(row) > 3 else None
-        try:
-            proveedor_id = int(str(proveedor_raw).strip()) if str(proveedor_raw).strip() else None
-        except ValueError:
-            proveedor_id = None
+        proveedor = str(proveedor_raw).strip() if proveedor_raw else None
 
         for idx in range(fixed_cols, len(headers)):
             fecha = _parse_header_date(headers[idx])
@@ -519,7 +517,7 @@ def leer_entradas_sheet() -> list[dict]:
                 'producto': producto,
                 'categoria': categoria,
                 'unidad': unidad,
-                'proveedor_id': proveedor_id,
+                'proveedor': proveedor,
                 'fecha': fecha,
                 'cantidad': cantidad,
                 'responsable': responsable,
@@ -569,17 +567,17 @@ def guardar_inventario_postgres(registros: list[dict[str, Any]]) -> int:
                 try:
                     cur.execute(
                         """
-                        INSERT INTO inventario_catalogo (producto, categoria, unidad_tipo, stock_minimo, proveedor_id, activo)
+                        INSERT INTO inventario_catalogo (producto, categoria, unidad_tipo, stock_minimo, proveedor, activo)
                         VALUES (%s, %s, %s, %s, %s, TRUE)
                         ON CONFLICT (producto) DO UPDATE
                         SET
                             categoria = EXCLUDED.categoria,
                             unidad_tipo = EXCLUDED.unidad_tipo,
                             stock_minimo = COALESCE(EXCLUDED.stock_minimo, inventario_catalogo.stock_minimo),
-                            proveedor_id = COALESCE(EXCLUDED.proveedor_id, inventario_catalogo.proveedor_id),
+                            proveedor = COALESCE(EXCLUDED.proveedor, inventario_catalogo.proveedor),
                             activo = TRUE
                         """,
-                        (r['producto'], r['categoria'], r['unidad'], r['stock_min'], r['proveedor_id']),
+                        (r['producto'], r['categoria'], r['unidad'], r['stock_min'], r.get('proveedor')),
                     )
 
                     cur.execute('SELECT id FROM inventario_catalogo WHERE producto = %s', (r['producto'],))
@@ -670,17 +668,17 @@ def guardar_entradas_postgres(entradas: list[dict]) -> int:
 
                 cur.execute("""
                     INSERT INTO entradas_inventario
-                        (fecha, producto_id, cantidad, unidad, proveedor_id, responsable, fuente)
+                        (fecha, producto_id, cantidad, unidad, proveedor, responsable, fuente)
                     VALUES (%s, %s, %s, %s, %s, %s, 'sheets')
                     ON CONFLICT (fecha, producto_id) DO UPDATE
                     SET
                         cantidad = EXCLUDED.cantidad,
                         unidad = EXCLUDED.unidad,
-                        proveedor_id = COALESCE(EXCLUDED.proveedor_id, entradas_inventario.proveedor_id),
+                        proveedor = COALESCE(EXCLUDED.proveedor, entradas_inventario.proveedor),
                         responsable = COALESCE(NULLIF(EXCLUDED.responsable, ''), entradas_inventario.responsable),
                         fuente = EXCLUDED.fuente
                 """, (e['fecha'], producto_id, e['cantidad'], e['unidad'],
-                      e['proveedor_id'], e['responsable']))
+                      e.get('proveedor'), e['responsable']))
                 saved += 1
         conn.commit()
     return saved
@@ -806,7 +804,7 @@ def analizar_diferencias(fecha_hoy: date, fecha_ayer: date) -> list[dict[str, An
         c.categoria,
         c.unidad_tipo,
         c.stock_minimo,
-        c.proveedor_id,
+        c.proveedor,
         h.cantidad_normalizada AS cantidad_hoy,
         y.cantidad_normalizada AS cantidad_ayer,
         (COALESCE(y.cantidad_normalizada, 0) + COALESCE(ei.total_entradas, 0) - COALESCE(h.cantidad_normalizada, 0)) AS consumo_real
@@ -843,7 +841,7 @@ def analizar_diferencias(fecha_hoy: date, fecha_ayer: date) -> list[dict[str, An
             'categoria': row['categoria'],
             'unidad': row['unidad_tipo'],
             'stock_min': stock_min,
-            'proveedor_id': row['proveedor_id'],
+            'proveedor': row['proveedor'],
             'cantidad_hoy': cantidad_hoy,
             'cantidad_ayer': cantidad_ayer,
             'delta': consumo_real,
@@ -1039,23 +1037,20 @@ def enviar_telegram(chat_id: str | int, texto: str) -> dict[str, Any]:
 def notificacion_miercoles() -> None:
     hoy = datetime.now().date()
     diferencias = analizar_diferencias(hoy, hoy - timedelta(days=1))
-    proveedores = leer_proveedores_sheet()
 
     bajos = [d for d in diferencias if d['bajo_minimo']]
-    agrupado: dict[int | None, list[dict[str, Any]]] = {}
+    agrupado: dict[str, list[dict[str, Any]]] = {}
     for item in bajos:
-        agrupado.setdefault(item['proveedor_id'], []).append(item)
+        prov = item['proveedor'] or 'Sin Proveedor'
+        agrupado.setdefault(prov, []).append(item)
 
     lines = [f'🧾 <b>Pedido Miércoles</b> ({hoy.strftime("%d/%m/%Y")})', '']
 
     if not agrupado:
         lines.append('✅ No hay productos bajo mínimo para pedir hoy.')
     else:
-        for proveedor_id, items in agrupado.items():
-            prov = proveedores.get(proveedor_id or -1, {})
-            nombre = prov.get('nombre') or f'Proveedor {proveedor_id or "N/D"}'
-            telefono = prov.get('telefono') or 'sin teléfono'
-            lines.append(f'🏪 <b>{nombre}</b> ({telefono})')
+        for prov_nombre, items in agrupado.items():
+            lines.append(f'🏪 <b>{prov_nombre.upper()}</b>')
             for it in items:
                 lines.append(
                     f"• {it['producto']}: {it['cantidad_hoy']} {it['unidad'] or ''} (mín {it['stock_min']})"
@@ -1067,7 +1062,6 @@ def notificacion_miercoles() -> None:
 
 def notificacion_lunes_postres() -> None:
     postres = leer_postres_sheet()
-    proveedores = leer_proveedores_sheet()
 
     bajo_min = []
     for p in postres:
@@ -1083,8 +1077,7 @@ def notificacion_lunes_postres() -> None:
     else:
         lines.append('⚠️ <b>Postres bajo mínimo</b>')
         for p in bajo_min:
-            prov = proveedores.get(p['proveedor_id'] or -1, {})
-            proveedor = prov.get('nombre', f"Proveedor {p['proveedor_id'] or 'N/D'}")
+            proveedor = p.get('proveedor') or 'N/D'
             lines.append(
                 f"• <b>{p['producto']}</b>: {p['stock_actual']} (mín {p['stock_min']}) | {proveedor}"
             )
