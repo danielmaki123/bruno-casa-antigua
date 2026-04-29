@@ -10,17 +10,20 @@
 - /ventas, /stock, /resumen, /cierre [fecha]
 
 ## Acción: Ventas del día
-Ejecutar: python /app/scripts/reporte_tool.py --action ventas_hoy
-Responder con el output directamente.
+DEBES usar tu herramienta de terminal (bash/shell) para ejecutar exactamente este comando:
+`python /app/scripts/reporte_tool.py --action ventas_hoy`
+NO inventes los datos. Ejecuta el comando y envía la respuesta del comando al usuario.
 
 ## Acción: Ventas de la semana
-Ejecutar: python /app/scripts/reporte_tool.py --action ventas_semana
-Responder con el output directamente.
+DEBES usar tu herramienta de terminal (bash/shell) para ejecutar exactamente este comando:
+`python /app/scripts/reporte_tool.py --action ventas_semana`
+NO inventes los datos. Ejecuta el comando y envía la respuesta del comando al usuario.
 
 ## Acción: Cierre de una fecha específica
-Si el usuario menciona una fecha (ayer, lunes, 27/04, etc.), convertir a YYYY-MM-DD.
-Ejecutar: python /app/scripts/reporte_tool.py --action cierre --fecha YYYY-MM-DD
-Responder con el output.
+Extrae la fecha en formato YYYY-MM-DD.
+DEBES usar tu herramienta de terminal (bash/shell) para ejecutar exactamente este comando:
+`python /app/scripts/reporte_tool.py --action cierre --fecha YYYY-MM-DD`
+NO inventes los datos. Ejecuta el comando y envía la respuesta del comando al usuario.
 
 ## Acción: Stock bajo mínimo
 Ejecutar: python /app/scripts/reporte_tool.py --action stock_bajo
