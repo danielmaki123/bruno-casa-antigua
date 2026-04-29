@@ -207,7 +207,7 @@ def q_stock_bajo(conn) -> str:
             """
             SELECT producto, categoria, stock_actual, stock_minimo
             FROM stock_vs_minimo
-            WHERE bajo_minimo = TRUE
+            WHERE bajo_minimo = TRUE OR (stock_actual <= 0 AND stock_minimo >= 0)
             ORDER BY categoria, producto
             """
         )

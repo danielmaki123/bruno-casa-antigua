@@ -847,7 +847,7 @@ def analizar_diferencias(fecha_hoy: date, fecha_ayer: date) -> list[dict[str, An
             'cantidad_hoy': cantidad_hoy,
             'cantidad_ayer': cantidad_ayer,
             'delta': consumo_real,
-            'bajo_minimo': (cantidad_hoy is not None and stock_min is not None and cantidad_hoy < stock_min),
+            'bajo_minimo': (cantidad_hoy is not None and stock_min is not None and (cantidad_hoy < stock_min or (cantidad_hoy <= 0 and stock_min >= 0))),
         })
 
     return out
@@ -1051,7 +1051,7 @@ def notificacion_miercoles() -> None:
                 )
             lines.append('')
 
-    enviar_telegram(GROUP_ID_ADMIN, '\n'.join(lines))
+    enviar_telegram(GROUP_ID_INVENTARIO, '\n'.join(lines))
 
 
 def notificacion_lunes_postres() -> None:
@@ -1078,7 +1078,7 @@ def notificacion_lunes_postres() -> None:
                 f"• <b>{p['producto']}</b>: {p['stock_actual']} (mín {p['stock_min']}) | {proveedor}"
             )
 
-    enviar_telegram(GROUP_ID_ADMIN, '\n'.join(lines))
+    enviar_telegram(GROUP_ID_INVENTARIO, '\n'.join(lines))
 
 
 def run_once() -> None:
