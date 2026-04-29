@@ -6,6 +6,10 @@ model:
     base_url: "${OPENAI_BASE_URL}"
     api_key: "${OPENAI_API_KEY}"
 
+tools:
+  enabled:
+    - terminal
+
 platforms:
   telegram:
     enabled: true
