@@ -8,3 +8,4 @@ openai
 httpx
 apscheduler
 psycopg2-binary
+pypdf

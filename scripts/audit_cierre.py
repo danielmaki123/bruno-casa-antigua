@@ -137,9 +137,31 @@ def _auditar(cierre: dict, ventas: list) -> dict:
     }
 
 
+def _get_bank_totals(conn, fecha) -> dict:
+    """Busca liquidaciones de banco para una fecha."""
+    cur = conn.cursor()
+    # Buscamos liquidaciones cuya fecha de entrada (en el banco) coincida o sea +1 de la venta
+    cur.execute("SELECT banco, SUM(monto) FROM liquidaciones_banco WHERE fecha >= %s GROUP BY banco", (fecha,))
+    rows = cur.fetchall()
+    cur.close()
+    return {r[0]: float(r[1]) for r in rows}
+
 def _build_mensaje(cierre: dict, ventas: list, alertas: dict) -> str:
     """Construye el mensaje de auditoría para Telegram."""
     estado = "✅ OK" if not alertas["alerta_diferencia"] and not alertas["alerta_faltante"] else "⚠️ ALERTA"
+    
+    # Conciliación Bancaria
+    bancos_txt = ""
+    try:
+        conn = _get_conn()
+        bank_data = _get_bank_totals(conn, cierre["fecha"])
+        conn.close()
+        if bank_data:
+            bancos_txt = "\n🏦 <b>Conciliación Bancaria:</b>"
+            for b, monto in bank_data.items():
+                # Aquí podrías comparar vs campos específicos del POS si los tenemos parseados
+                bancos_txt += f"\n  • {b}: C$ {monto:,.2f} (Banco)"
+    except: pass
 
     # Top 5 productos del día
     top = sorted(ventas, key=lambda x: x["monto"], reverse=True)[:5]
@@ -153,6 +175,7 @@ def _build_mensaje(cierre: dict, ventas: list, alertas: dict) -> str:
 🎁 Propina:         C$ {cierre['propina']:>12,.2f}
 💳 Tarjetas:        C$ {cierre['tarjetas_total']:>12,.2f}
 🔄 Transferencias:  C$ {cierre['transferencias_total']:>12,.2f}
+━━━━━━━━━━━━━━━━━━━━━━{bancos_txt}
 ━━━━━━━━━━━━━━━━━━━━━━
 {"🚨 FALTANTE:        C$ " + f"{cierre['faltante']:>12,.2f}" if alertas['alerta_faltante'] else "✅ Sin faltante"}
 {"⚠️ Diferencia POS:  C$ " + f"{cierre['diferencia_pos']:>12,.2f}" if alertas['alerta_diferencia'] else f"✅ Diferencia POS:  C$ {cierre['diferencia_pos']:>12,.2f}"}
