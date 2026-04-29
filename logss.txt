@@ -1,31 +1,37 @@
-##########################################
-### Cloning repository
-### Wed, 29 Apr 2026 15:15:29 GMT
-##########################################
+┌─────────────────────────────────────────────────────────┐
+│           ⚕ Hermes Gateway Starting...                 │
+├─────────────────────────────────────────────────────────┤
+│  Messaging platforms + cron scheduler                    │
+│  Press Ctrl+C to stop                                   │
+└─────────────────────────────────────────────────────────┘
 
-Commit: feat: add Dockerfiles for bruno-inventario and bruno-monitor services 
-ERROR: failed to build: unable to prepare context: path "/etc/easypanel/projects/brunobot/brunoinventario/code/Dockerfile" not found
-##########################################
-### Error
-### Wed, 29 Apr 2026 15:15:30 GMT
-##########################################
-
-Command failed with exit code 1: docker buildx build --network host -f /etc/easypanel/projects/brunobot/brunoinventario/code/Dockerfile/Dockerfile.inventario -t easypanel/brunobot/brunoinventario --label 'keep=true' --build-arg 'DATABASE_URL=postgres://postgres:06c5f13aaaaa58a7f6f1@brunobot_bruno:5432/brunobot?sslmode=disable' --build-arg 'TELEGRAM_BOT_TOKEN=7966714860:AAHe-3uHpzlsZPwoHNnzD_5GHaNYKaDvuDk' --build-arg 'GROUP_ID_ADMIN=-4944632677' --build-arg 'GROUP_ID_INVENTARIO=-5240974489' --build-arg 'GOOGLE_SHEETS_ID=1PG5id1G_tpgMmLgCpkkRF8YXby0tidY0Wlb3smminxw' --build-arg 'INVENTARIO_CHECK_INTERVAL=3600' --build-arg 'SHEETS_ID_BEBIDAS=1PG5id1G_tpgMmLgCpkkRF8YXby0tidY0Wlb3smminxw' --build-arg 'SHEETS_ID_ADMIN=1QQnEekHPRPaMgSYFjzbJWTftL_rj1RGQyfOccKfYNP8' --build-arg 'SHEETS_ID_CONFIG=19TVVHdzOqVd1PiQdVvVokcGAT4uSaMJREFDvHSIJzuk' --build-arg 'GIT_SHA=a7092b7c1eab8cb8be961c27b63712cfb2867bd5' /etc/easypanel/projects/brunobot/brunoinventario/code/Dockerfile
-
-
-
-
-
-##########################################
-### Cloning repository
-### Wed, 29 Apr 2026 15:16:16 GMT
-##########################################
-
-Commit: feat: add Dockerfiles for bruno-inventario and bruno-monitor services 
-ERROR: failed to build: unable to prepare context: path "/etc/easypanel/projects/brunobot/brunomonitor/code/Dockerfile" not found
-##########################################
-### Error
-### Wed, 29 Apr 2026 15:16:17 GMT
-##########################################
-
-Command failed with exit code 1: docker buildx build --network host -f /etc/easypanel/projects/brunobot/brunomonitor/code/Dockerfile/Dockerfile.monitor -t easypanel/brunobot/brunomonitor --label 'keep=true' --build-arg 'DATABASE_URL=postgres://postgres:06c5f13aaaaa58a7f6f1@brunobot_bruno:5432/brunobot?sslmode=disable' --build-arg 'TELEGRAM_BOT_TOKEN=7966714860:AAHe-3uHpzlsZPwoHNnzD_5GHaNYKaDvuDk' --build-arg 'GROUP_ID_ADMIN=-4944632677' --build-arg 'GOOGLE_SHEETS_ID=1PG5id1G_tpgMmLgCpkkRF8YXby0tidY0Wlb3smminxw' --build-arg 'GMAIL_CHECK_INTERVAL=300' --build-arg 'GMAIL_SUBJECT_FILTER=Cierre de Caja' --build-arg 'GIT_SHA=a7092b7c1eab8cb8be961c27b63712cfb2867bd5' /etc/easypanel/projects/brunobot/brunomonitor/code/Dockerfile
+WARNING gateway.platforms.telegram: [Telegram] Telegram polling conflict (1/3), will retry in 10s. Error: Conflict: terminated by other getUpdates request; make sure that only one bot instance is running
+ERROR gateway.run: Agent error in session agent:main:telegram:dm:1968135292
+Traceback (most recent call last):
+  File "/opt/hermes/gateway/run.py", line 5151, in _handle_message_with_agent
+    agent_result = await self._run_agent(
+                   ^^^^^^^^^^^^^^^^^^^^^^
+    ...<9 lines>...
+    )
+    ^
+  File "/opt/hermes/gateway/run.py", line 11353, in _run_agent
+    response = _executor_task.result()
+  File "/opt/hermes/gateway/run.py", line 8824, in _run_in_executor_with_context
+    return await loop.run_in_executor(None, ctx.run, func, *args)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/usr/lib/python3.13/concurrent/futures/thread.py", line 59, in run
+    result = self.fn(*self.args, **self.kwargs)
+  File "/opt/hermes/gateway/run.py", line 10642, in run_sync
+    agent = AIAgent(
+        model=turn_route["model"],
+    ...<26 lines>...
+        fallback_model=self._fallback_model,
+    )
+  File "/opt/hermes/run_agent.py", line 1977, in __init__
+    raise ValueError(
+    ...<5 lines>...
+    )
+ValueError: Model moonshot-v1-32k has a context window of 32,000 tokens, which is below the minimum 64,000 required by Hermes Agent.  Choose a model with at least 64K context, or set model.context_length in config.yaml to override.
+ERROR gateway.run: Agent error in session agent:main:telegram:dm:1968135292
+Traceback (most recent call last):
+  File "/opt/hermes/gateway/run.py", line 5151, in _handle_message_with_agentll start a fresh session.
