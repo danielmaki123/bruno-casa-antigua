@@ -1,7 +1,7 @@
 # BrunoBot — Casa Antigua
 # Extends the official Hermes Agent image with our custom skills and tools
 
-FROM ghcr.io/nousresearch/hermes-agent:latest
+FROM nousresearch/hermes-agent:latest
 
 # Set working directory (Hermes default)
 WORKDIR /app
