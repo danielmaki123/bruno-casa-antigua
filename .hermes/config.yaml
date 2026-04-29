@@ -1,7 +1,7 @@
 model:
   default: "moonshot-v1-32k"
   provider: custom
-  context_length: 32000
+  context_length: 64000
   custom:
     base_url: "${OPENAI_BASE_URL}"
     api_key: "${OPENAI_API_KEY}"
