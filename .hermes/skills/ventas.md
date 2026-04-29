@@ -10,33 +10,33 @@
 - /ventas, /stock, /resumen, /cierre [fecha]
 
 ## Acción: Ventas del día
-Ejecutar: python scripts/reporte_tool.py --action ventas_hoy
+Ejecutar: python /app/scripts/reporte_tool.py --action ventas_hoy
 Responder con el output directamente.
 
 ## Acción: Ventas de la semana
-Ejecutar: python scripts/reporte_tool.py --action ventas_semana
+Ejecutar: python /app/scripts/reporte_tool.py --action ventas_semana
 Responder con el output directamente.
 
 ## Acción: Cierre de una fecha específica
 Si el usuario menciona una fecha (ayer, lunes, 27/04, etc.), convertir a YYYY-MM-DD.
-Ejecutar: python scripts/reporte_tool.py --action cierre --fecha YYYY-MM-DD
+Ejecutar: python /app/scripts/reporte_tool.py --action cierre --fecha YYYY-MM-DD
 Responder con el output.
 
 ## Acción: Stock bajo mínimo
-Ejecutar: python scripts/reporte_tool.py --action stock_bajo
+Ejecutar: python /app/scripts/reporte_tool.py --action stock_bajo
 Si hay alertas, agregar: "¿Quieres que prepare la lista de compras?"
 
 ## Acción: Inventario actual
-Ejecutar: python scripts/reporte_tool.py --action inventario_actual
+Ejecutar: python /app/scripts/reporte_tool.py --action inventario_actual
 Responder con el output.
 
 ## Acción: Discrepancias
-Ejecutar: python scripts/reporte_tool.py --action discrepancias
+Ejecutar: python /app/scripts/reporte_tool.py --action discrepancias
 Responder con el output. Si hay discrepancias, agregar: "¿Quieres que investiguemos alguna?"
 
 ## Acción: Resumen general
 Si el usuario pide un resumen o usa /resumen:
-Ejecutar: python scripts/reporte_tool.py --action resumen
+Ejecutar: python /app/scripts/reporte_tool.py --action resumen
 Responder con el output.
 
 ## Reglas
