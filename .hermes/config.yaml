@@ -1,3 +1,15 @@
-﻿model:
-  default: "kimi-k2.5"
+model:
+  default: "moonshot-v1-8k"
   provider: custom
+  custom:
+    base_url: "${OPENAI_BASE_URL}"
+    api_key: "${OPENAI_API_KEY}"
+
+platforms:
+  telegram:
+    enabled: true
+    token: "${TELEGRAM_BOT_TOKEN}"
+    reply_to_mode: "first"
+    extra:
+      require_mention: false
+      disable_link_previews: false

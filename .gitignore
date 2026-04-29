@@ -1,56 +1,55 @@
-# Secretos y Configuraci√≥n
-.env
-*.json
-!docker-compose.yml
-!package.json
-!composer.json
+# ============================================================
+# BrunoBot ‚Äî .gitignore
+# ============================================================
 
-# Base de datos y Memoria
-*.db
-*.sqlite
-.hermes/memory/
-
-# Python
-__pycache__/
-*.py[cod]
-*$py.class
-venv/
-ENV/
-
-# Excel Temporales
-~$*.xlsx
-
-# Credenciales ó NUNCA subir
+# --- Credenciales y Secretos (NUNCA subir) ---
 .env
 token.json
 client_secret.json
+client_secret_*.json
 credentials.json
 service_account.json
 *.pem
 *.key
+*.p12
 
-# Hermes auth ó NUNCA subir
+# --- Hermes auth ---
 .hermes/token.json
 .hermes/client_secret.json
+.hermes/memory/
 
-# Python
+# --- Datos del restaurante (informaci√≥n real/privada) ---
+datos casa antigua/
+chatteleg.txt
+logseasy.txt
+*.pdf
+
+# --- Python ---
 __pycache__/
 *.py[cod]
 *.pyo
 .venv/
 venv/
 env/
+ENV/
 *.egg-info/
 dist/
 build/
 
-# Sistema
+# --- Base de datos locales ---
+*.db
+*.sqlite
+
+# --- Sistema ---
 .DS_Store
 Thumbs.db
 *.log
 *.tmp
+*.swp
 
-# IDE
+# --- IDE ---
 .vscode/
 .idea/
-*.swp
+
+# --- Herramientas internas ---
+.omx/
