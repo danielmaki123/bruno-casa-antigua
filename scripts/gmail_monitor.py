@@ -45,7 +45,7 @@ logger = logging.getLogger("gmail_monitor")
 CHECK_INTERVAL   = int(os.getenv("GMAIL_CHECK_INTERVAL", "300"))  # segundos entre checks
 SUBJECT_FILTER   = os.getenv("GMAIL_SUBJECT_FILTER", "Cierre de Caja")
 GMAIL_API        = "https://gmail.googleapis.com/gmail/v1/users/me"
-PROCESSED_FILE   = Path(tempfile.gettempdir()) / "brunobot_processed_emails.json"
+PROCESSED_FILE   = Path(os.getenv("PROCESSED_EMAILS_PATH", "/app/data/processed_emails.json"))
 
 # Nombres esperados de los PDFs adjuntos
 PDF_CIERRE_KEYWORDS = ["cierre", "cierrepos", "cierre_pos", "cierredepos"]

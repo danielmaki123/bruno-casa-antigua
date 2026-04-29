@@ -9,4 +9,7 @@ COPY scripts/gmail_monitor.py /app/scripts/gmail_monitor.py
 COPY scripts/parse_cierre.py /app/scripts/parse_cierre.py
 COPY scripts/audit_cierre.py /app/scripts/audit_cierre.py
 
+# Directorio persistente para el estado de emails procesados
+RUN mkdir -p /app/data
+
 CMD ["python", "scripts/gmail_monitor.py"]
