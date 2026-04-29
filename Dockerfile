@@ -17,9 +17,9 @@ COPY requirements.txt /app/requirements.txt
 RUN pip3 install --no-cache-dir -r /app/requirements.txt --break-system-packages
 
 # Copy Bruno personality, skills, and config into Hermes home directory
-COPY .hermes/SOUL.md /root/.hermes/SOUL.md
-COPY .hermes/skills/ /root/.hermes/skills/
-COPY .hermes/config.yaml /root/.hermes/config.yaml
+COPY .hermes/SOUL.md /opt/data/SOUL.md
+COPY .hermes/skills/ /opt/data/skills/
+COPY .hermes/config.yaml /opt/data/config.yaml
 
 # Copy Python bridge scripts invoked by Hermes tools/skills
 COPY scripts/sheets_tool.py /app/scripts/sheets_tool.py
