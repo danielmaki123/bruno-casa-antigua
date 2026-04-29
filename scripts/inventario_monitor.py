@@ -1,4 +1,4 @@
-﻿import argparse
+import argparse
 import json
 import os
 import time
@@ -562,53 +562,73 @@ def guardar_inventario_postgres(registros: list[dict[str, Any]]) -> int:
         return 0
 
     inserted = 0
+    skipped = []
     with psycopg2.connect(DATABASE_URL) as conn:
         with conn.cursor() as cur:
             for r in registros:
-                cur.execute(
-                    """
-                    INSERT INTO inventario_catalogo (producto, categoria, unidad_tipo, stock_minimo, proveedor_id, activo)
-                    VALUES (%s, %s, %s, %s, %s, TRUE)
-                    ON CONFLICT (producto) DO UPDATE
-                    SET
-                        categoria = EXCLUDED.categoria,
-                        unidad_tipo = EXCLUDED.unidad_tipo,
-                        stock_minimo = COALESCE(EXCLUDED.stock_minimo, inventario_catalogo.stock_minimo),
-                        proveedor_id = COALESCE(EXCLUDED.proveedor_id, inventario_catalogo.proveedor_id),
-                        activo = TRUE
-                    """,
-                    (r['producto'], r['categoria'], r['unidad'], r['stock_min'], r['proveedor_id']),
-                )
+                try:
+                    cur.execute(
+                        """
+                        INSERT INTO inventario_catalogo (producto, categoria, unidad_tipo, stock_minimo, proveedor_id, activo)
+                        VALUES (%s, %s, %s, %s, %s, TRUE)
+                        ON CONFLICT (producto) DO UPDATE
+                        SET
+                            categoria = EXCLUDED.categoria,
+                            unidad_tipo = EXCLUDED.unidad_tipo,
+                            stock_minimo = COALESCE(EXCLUDED.stock_minimo, inventario_catalogo.stock_minimo),
+                            proveedor_id = COALESCE(EXCLUDED.proveedor_id, inventario_catalogo.proveedor_id),
+                            activo = TRUE
+                        """,
+                        (r['producto'], r['categoria'], r['unidad'], r['stock_min'], r['proveedor_id']),
+                    )
 
-                cur.execute('SELECT id FROM inventario_catalogo WHERE producto = %s', (r['producto'],))
-                row = cur.fetchone()
-                if not row:
-                    continue
-                producto_id = row[0]
+                    cur.execute('SELECT id FROM inventario_catalogo WHERE producto = %s', (r['producto'],))
+                    row = cur.fetchone()
+                    if not row:
+                        continue
+                    producto_id = row[0]
 
-                cur.execute(
-                    """
-                    INSERT INTO inventario_diario (
-                        fecha, producto_id, cantidad_raw, unidad_raw, cantidad_normalizada, responsable, fuente
-                    ) VALUES (%s, %s, %s, %s, %s, %s, 'sheets')
-                    ON CONFLICT (fecha, producto_id) DO UPDATE
-                    SET
-                        cantidad_raw = EXCLUDED.cantidad_raw,
-                        unidad_raw = EXCLUDED.unidad_raw,
-                        cantidad_normalizada = EXCLUDED.cantidad_normalizada,
-                        responsable = EXCLUDED.responsable,
-                        fuente = EXCLUDED.fuente
-                    """,
-                    (
-                        r['fecha'],
-                        producto_id,
-                        r['cantidad_raw'] if r['cantidad_raw'] not in (None, '') else None,
-                        r['unidad'],
-                        r['cantidad_normalizada'],
-                        r.get('responsable', ''),
-                    ),
-                )
-                inserted += 1
+                    # cantidad_raw es NUMERIC en la DB — pasar el valor ya parseado (float),
+                    # NO el string crudo ('2,5', '1/2', etc.) que PostgreSQL rechazaría.
+                    cantidad_para_db = r['cantidad_normalizada']  # ya es float o None
+
+                    cur.execute(
+                        """
+                        INSERT INTO inventario_diario (
+                            fecha, producto_id, cantidad_raw, unidad_raw, cantidad_normalizada, responsable, fuente
+                        ) VALUES (%s, %s, %s, %s, %s, %s, 'sheets')
+                        ON CONFLICT (fecha, producto_id) DO UPDATE
+                        SET
+                            cantidad_raw = EXCLUDED.cantidad_raw,
+                            unidad_raw = EXCLUDED.unidad_raw,
+                            cantidad_normalizada = EXCLUDED.cantidad_normalizada,
+                            responsable = EXCLUDED.responsable,
+                            fuente = EXCLUDED.fuente
+                        """,
+                        (
+                            r['fecha'],
+                            producto_id,
+                            cantidad_para_db,
+                            r['unidad'],
+                            r['cantidad_normalizada'],
+                            r.get('responsable', ''),
+                        ),
+                    )
+                    inserted += 1
+                except psycopg2.Error as row_err:
+                    # Fila con datos inválidos — saltar y loggear sin romper el batch.
+                    conn.rollback()
+                    raw_val = r.get('cantidad_raw', '?')
+                    producto = r.get('producto', '?')
+                    print(
+                        f'[WARN] Fila omitida por error DB '
+                        f'(producto={producto!r}, cantidad_raw={raw_val!r}): {row_err}',
+                        flush=True,
+                    )
+                    skipped.append(f'{producto}: {raw_val!r}')
+
+    if skipped:
+        print(f'[WARN] {len(skipped)} filas omitidas por datos inválidos: {skipped}', flush=True)
     return inserted
 
 
@@ -1133,11 +1153,16 @@ def run_once() -> None:
             enviar_telegram(GROUP_ID_INVENTARIO, resumen_text)
             registrar_notificacion('resumen_diario', resumen_text)
     except (RequestException, psycopg2.Error, RuntimeError, ValueError) as exc:
-        enviar_telegram(
-            GROUP_ID_ADMIN,
-            f'❌ <b>Error inventario_monitor</b>\n<code>{type(exc).__name__}: {exc}</code>',
-        )
-        raise
+        # Solo enviar alerta si no se envió en las últimas 2 horas
+        # (evita loops de mensajes si el error es persistente).
+        if not ya_notificado_hoy('error_monitor'):
+            enviar_telegram(
+                GROUP_ID_ADMIN,
+                f'❌ <b>Error inventario_monitor</b>\n<code>{type(exc).__name__}: {exc}</code>',
+            )
+            registrar_notificacion('error_monitor', str(exc))
+        print(f'[ERROR] run_once falló: {exc}', flush=True)
+        # NO re-lanzar: el loop principal debe continuar, no morir.
 
 
 def main() -> None:
@@ -1166,14 +1191,18 @@ def main() -> None:
         return
 
     while True:
-        run_once()
-        now = datetime.now()
-        if now.weekday() == 2 and 11 <= now.hour <= 12 and not ya_notificado_hoy('compras_miercoles'):
-            notificacion_miercoles()
-            registrar_notificacion('compras_miercoles', 'Notificacion de compras del miercoles enviada.')
-        if now.weekday() == 0 and 7 <= now.hour <= 8 and not ya_notificado_hoy('postres_lunes'):
-            notificacion_lunes_postres()
-            registrar_notificacion('postres_lunes', 'Notificacion de postres del lunes enviada.')
+        try:
+            run_once()
+            now = datetime.now()
+            if now.weekday() == 2 and 11 <= now.hour <= 12 and not ya_notificado_hoy('compras_miercoles'):
+                notificacion_miercoles()
+                registrar_notificacion('compras_miercoles', 'Notificacion de compras del miercoles enviada.')
+            if now.weekday() == 0 and 7 <= now.hour <= 8 and not ya_notificado_hoy('postres_lunes'):
+                notificacion_lunes_postres()
+                registrar_notificacion('postres_lunes', 'Notificacion de postres del lunes enviada.')
+        except Exception as loop_exc:
+            # Captura de último recurso: el proceso NO debe morir aunque run_once falle.
+            print(f'[CRITICAL] Error inesperado en loop principal: {loop_exc}', flush=True)
         time.sleep(INVENTARIO_CHECK_INTERVAL)
 
 
