@@ -971,42 +971,53 @@ def analizar_consumo_cierre(fecha: date) -> list[dict[str, Any]]:
 
 def generar_reporte_inventario(fecha: date) -> str:
     diferencias = analizar_diferencias(fecha, fecha - timedelta(days=1))
+    
+    if not diferencias:
+        return f'📦 <b>Reporte de Inventario</b> ({fecha.strftime("%d/%m/%Y")})\n✅ Sin datos registrados hoy.'
 
-    bajos = [d for d in diferencias if d['bajo_minimo']]
-    cambios = [d for d in diferencias if d['delta'] not in (None, 0.0)]
+    # Agrupar por categoría
+    por_categoria = {}
+    for d in diferencias:
+        cat = d['categoria'] or "OTROS"
+        por_categoria.setdefault(cat, []).append(d)
 
-    lines = [
-        f'📦 <b>Reporte Inventario</b> ({fecha.strftime("%d/%m/%Y")})',
-        '',
-        f'🧾 Productos analizados: <b>{len(diferencias)}</b>',
-        f'⚠️ Bajo mínimo: <b>{len(bajos)}</b>',
-        f'🔄 Con cambios vs ayer: <b>{len(cambios)}</b>',
-        '',
-    ]
+    reportes = []
+    for cat, items in por_categoria.items():
+        # Ordenar: primero los bajos, luego alfabético
+        items = sorted(items, key=lambda x: (not x['bajo_minimo'], x['producto']))
+        
+        # Solo mostrar categorías que tengan movimiento o stock bajo
+        hay_movimiento = any(x['bajo_minimo'] or x.get('entradas', 0) > 0 or (x['delta'] is not None and x['delta'] > 0) for x in items)
+        
+        if not hay_movimiento:
+            continue
 
-    if bajos:
-        lines.append('🚨 <b>Stock Bajo Mínimo</b>')
-        for d in bajos:
-            unidad = d['unidad'] or ''
-            lines.append(
-                f"• <b>{d['producto']}</b>: {d['cantidad_hoy']} {unidad} (mín {d['stock_min']})"
-            )
-        lines.append('')
+        lines = [f'📦 <b>INVENTARIO: {cat.upper()}</b>', '<code>']
+        header = f"{'PRODUCTO':<14} | {'STK':>5} | {'ENT':>5} | {'VTA':>5} | {'EST'}"
+        lines.append(header)
+        lines.append("-" * len(header))
 
-    if cambios:
-        lines.append('📉 <b>Diferencias vs Ayer</b>')
-        for d in cambios[:40]:
-            unidad = d['unidad'] or ''
-            delta = d['delta'] if d['delta'] is not None else 0
-            emoji = '⬆️' if delta > 0 else '⬇️'
-            lines.append(
-                f"• {emoji} <b>{d['producto']}</b>: {d['cantidad_ayer']} → {d['cantidad_hoy']} {unidad} (Δ {delta:+.2f})"
-            )
+        for d in items:
+            # Solo mostrar el item si: está bajo, entró algo, o se vendió algo
+            if not (d['bajo_minimo'] or d.get('entradas', 0) > 0 or (d['delta'] is not None and d['delta'] > 0)):
+                continue
+                
+            prod = (d['producto'][:14]) if len(d['producto']) > 14 else d['producto']
+            stk = float(d['cantidad_hoy'] or 0)
+            ent = float(d['entradas'] or 0)
+            vta = float(d['delta'] or 0)
+            est = "🚨" if d['bajo_minimo'] else "✅"
+            
+            lines.append(f"{prod:<14} | {stk:>5.1f} | {ent:>5.1f} | {vta:>5.1f} | {est}")
 
-    if len(lines) == 6:
-        lines.append('✅ Sin alertas ni cambios relevantes hoy.')
+        lines.append("-" * len(header))
+        lines.append("</code>")
+        reportes.append('\n'.join(lines))
 
-    return '\n'.join(lines)
+    if not reportes:
+        return f'📦 <b>Reporte de Inventario</b> ({fecha.strftime("%d/%m/%Y")})\n✅ Sin alertas ni movimientos relevantes.'
+
+    return '\n\n'.join(reportes)
 
 
 def enviar_telegram(chat_id: str | int, texto: str) -> dict[str, Any]:
