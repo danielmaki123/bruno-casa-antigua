@@ -159,6 +159,37 @@ def q_ventas_hoy(conn) -> str:
     )
 
 
+def q_ventas_categorias(conn, fecha: str = None) -> str:
+    log_action("ventas_categorias")
+    target = dt.date.fromisoformat(fecha) if fecha else dt.date.today()
+    with conn.cursor() as cur:
+        cur.execute(
+            """
+            SELECT categoria, total_unidades, total_monto
+            FROM ventas_por_categoria
+            WHERE fecha = %s
+            ORDER BY total_monto DESC
+            """,
+            (target,),
+        )
+        rows = cur.fetchall()
+
+    if not rows:
+        return f"Sin datos de categorías para el día {fmt_date_short(target)} (tabla: ventas_por_categoria)"
+
+    lines = [f"📦 Ventas por Categoría ({fmt_date_short(target)}):", ""]
+    total_dia = 0
+    for row in rows:
+        monto = float(row["total_monto"] or 0)
+        total_dia += monto
+        lines.append(f"• <b>{(row['categoria'] or 'VARIOS').upper()}:</b> {fmt_money(monto)} ({int(row['total_unidades'])} items)")
+
+    lines.append("━━━━━━━━━━━━━━━━")
+    lines.append(f"Total Categorizado: {fmt_money(total_dia)}")
+    
+    return "\n".join(lines)
+
+
 def q_cierre(conn, fecha: str) -> str:
     log_action("cierre")
     target = dt.date.fromisoformat(fecha)
@@ -337,9 +368,10 @@ def main():
             "inventario_actual",
             "discrepancias",
             "resumen",
+            "ventas_categorias",
         ],
     )
-    parser.add_argument("--fecha", help="Fecha YYYY-MM-DD para accion cierre")
+    parser.add_argument("--fecha", help="Fecha YYYY-MM-DD para accion cierre o ventas_categorias")
     parser.add_argument("--dias", type=int, default=7, help="Dias para discrepancias (default: 7)")
     args = parser.parse_args()
 
@@ -401,6 +433,8 @@ def main():
                 print(q_discrepancias(conn, args.dias))
             elif args.action == "resumen":
                 print(q_resumen(conn))
+            elif args.action == "ventas_categorias":
+                print(q_ventas_categorias(conn, args.fecha))
     except Exception as e:
         print(f"Error DB: {str(e)}")
 

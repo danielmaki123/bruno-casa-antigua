@@ -11,6 +11,8 @@
 - inventario_actual -> `python /app/scripts/reporte_tool.py --action inventario_actual`
 - discrepancias -> `python /app/scripts/reporte_tool.py --action discrepancias`
 - resumen -> `python /app/scripts/reporte_tool.py --action resumen`
+- ventas_categorias -> `python /app/scripts/reporte_tool.py --action ventas_categorias`
+- ventas_categorias_fecha(YYYY-MM-DD) -> `python /app/scripts/reporte_tool.py --action ventas_categorias --fecha YYYY-MM-DD`
 
 ## HARD RULES (FOR THE AGENT)
 1. NEVER create, infer, or guess filenames.
@@ -21,4 +23,4 @@
 6. Single attempt only. If it fails, report the error.
 
 ## TRIGGER PHRASES
-- "ventas de hoy", "ventas de la semana", "cuanto vendimos", "stock", "inventario", "discrepancias", "/ventas", "/stock"
+- "ventas de hoy", "ventas de la semana", "cuanto vendimos", "stock", "inventario", "discrepancias", "/ventas", "/stock", "ventas por categoría", "categorías"
