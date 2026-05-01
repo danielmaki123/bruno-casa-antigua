@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BrunoBot - Flujo de Arquitectura</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.3);
+            --text: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #22c55e;
+            --warning: #f59e0b;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            line-height: 1.6;
+            overflow-x: hidden;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        h1 {
+            font-size: 3rem;
+            background: linear-gradient(to right, #38bdf8, #818cf8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.2rem;
+        }
+
+        .flow-container {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+            position: relative;
+        }
+
+        .step {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+            opacity: 0;
+            transform: translateY(20px);
+            animation: fadeIn 0.6s forwards;
+        }
+
+        .step:nth-child(1) { animation-delay: 0.2s; }
+        .step:nth-child(2) { animation-delay: 0.4s; }
+        .step:nth-child(3) { animation-delay: 0.6s; }
+        .step:nth-child(4) { animation-delay: 0.8s; }
+        .step:nth-child(5) { animation-delay: 1s; }
+
+        .icon-box {
+            min-width: 80px;
+            height: 80px;
+            background: var(--card-bg);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 2;
+        }
+
+        .icon-box::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 20px;
+            box-shadow: 0 0 15px var(--accent-glow);
+            opacity: 0.5;
+        }
+
+        .content-box {
+            background: var(--card-bg);
+            padding: 1.5rem;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            flex-grow: 1;
+            transition: transform 0.3s ease;
+        }
+
+        .content-box:hover {
+            transform: translateX(10px);
+            border-color: var(--accent);
+        }
+
+        h3 {
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+            font-size: 1.4rem;
+        }
+
+        p {
+            color: var(--text-muted);
+        }
+
+        /* Connecting lines */
+        .connector {
+            position: absolute;
+            left: 39px;
+            top: 80px;
+            bottom: 0;
+            width: 2px;
+            background: linear-gradient(to bottom, var(--accent), transparent);
+            z-index: 1;
+        }
+
+        @keyframes fadeIn {
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 0.2rem 0.6rem;
+            border-radius: 10px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            margin-top: 0.5rem;
+            background: rgba(56, 189, 248, 0.1);
+            color: var(--accent);
+            border: 1px solid var(--accent);
+        }
+
+        .database-section {
+            margin-top: 4rem;
+            padding: 2rem;
+            background: linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4));
+            border-radius: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .db-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+
+        .db-item {
+            padding: 1rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .db-item span {
+            display: block;
+            font-weight: bold;
+            color: var(--text);
+            margin-bottom: 0.3rem;
+        }
+
+        .db-item small {
+            color: var(--text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Ecosistema BrunoBot</h1>
+            <p class="subtitle">Arquitectura de Auditoría e Inventario Inteligente</p>
+        </header>
+
+        <div class="flow-container">
+            <div class="connector"></div>
+            
+            <div class="step">
+                <div class="icon-box">📧</div>
+                <div class="content-box">
+                    <h3>1. Origen: Gmail</h3>
+                    <p>El POS envía automáticamente los cierres de caja y ventas en PDF. El banco envía las liquidaciones BAC/BANPRO.</p>
+                    <div class="badge">Input de Datos</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="icon-box">🧠</div>
+                <div class="content-box">
+                    <h3>2. Proceso: Gmail Monitor</h3>
+                    <p>Un servicio 24/7 que escucha nuevos correos, descarga los PDFs y filtra la información relevante.</p>
+                    <div class="badge">Script: gmail_monitor.py</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="icon-box">📊</div>
+                <div class="content-box">
+                    <h3>3. Auditoría: Análisis PDF</h3>
+                    <p>El cerebro extrae datos numéricos de los PDFs, calcula faltantes de efectivo y cruza ventas reales contra el POS.</p>
+                    <div class="badge">Script: audit_cierre.py</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="icon-box">🗄️</div>
+                <div class="content-box">
+                    <h3>4. Almacén: PostgreSQL</h3>
+                    <p>Todo se guarda de forma estructurada para análisis histórico y visualización en dashboards (Metabase).</p>
+                    <div class="badge">Persistencia</div>
+                </div>
+            </div>
+
+            <div class="step">
+                <div class="icon-box">📱</div>
+                <div class="content-box">
+                    <h3>5. Alerta: Telegram</h3>
+                    <p>Bruno envía un resumen ejecutivo al grupo de administración: Ventas, Faltantes, Top Productos y Alertas de Stock.</p>
+                    <div class="badge">Notificación Real-Time</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="database-section">
+            <h2 style="text-align: center; color: var(--accent);">Historial en Base de Datos</h2>
+            <div class="db-grid">
+                <div class="db-item">
+                    <span>Cierres</span>
+                    <small>Resumen financiero diario</small>
+                </div>
+                <div class="db-item">
+                    <span>Ventas</span>
+                    <small>Detalle por producto</small>
+                </div>
+                <div class="db-item">
+                    <span>Banco</span>
+                    <small>Conciliación de depósitos</small>
+                </div>
+                <div class="db-item">
+                    <span>Inventario</span>
+                    <small>Conteo y stock histórico</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -116,24 +116,31 @@ def _auditar(cierre: dict, ventas: list) -> dict:
     Retorna dict con flags de alerta y notas.
     """
     total_ventas_menu = sum(v["monto"] for v in ventas)
+    # El monto 'exonerado' en el Cierre suele ser el subtotal de venta sin propina
     diff_cuadre = abs(cierre["exonerado"] - total_ventas_menu)
-    alerta_diferencia = cierre["diferencia_pos"] > UMBRAL_DIFERENCIA
+    
+    alerta_diferencia = abs(cierre["diferencia_pos"]) > UMBRAL_DIFERENCIA
     alerta_faltante   = cierre["faltante"] > 0
+    alerta_integridad = diff_cuadre > 1.0  # Si la diferencia es mayor a 1 córdoba
 
     notas = []
-    if diff_cuadre > 1:
-        notas.append(f"Cuadre cierre vs menu: diferencia C${diff_cuadre:,.2f}")
+    if alerta_integridad:
+        notas.append(f"❌ ERROR INTEGRIDAD: El menú suma C${total_ventas_menu:,.2f} pero el cierre dice C${cierre['exonerado']:,.2f} (Dif: C${diff_cuadre:,.2f})")
+    
     if alerta_diferencia:
-        notas.append(f"Diferencia POS supera umbral ({UMBRAL_DIFERENCIA} C$)")
+        notas.append(f"⚠️ Diferencia POS significativa: C${cierre['diferencia_pos']:,.2f}")
+    
     if alerta_faltante:
-        notas.append(f"FALTANTE detectado: C${cierre['faltante']:,.2f}")
+        notas.append(f"🚨 FALTANTE detectado: C${cierre['faltante']:,.2f}")
+    
     if cierre["sobrante"] > 0:
-        notas.append(f"Sobrante: C${cierre['sobrante']:,.2f}")
+        notas.append(f"💹 Sobrante: C${cierre['sobrante']:,.2f}")
 
     return {
         "alerta_diferencia": alerta_diferencia,
         "alerta_faltante":   alerta_faltante,
-        "notas_auditoria":   " | ".join(notas) if notas else "Sin alertas",
+        "alerta_integridad": alerta_integridad,
+        "notas_auditoria":   " | ".join(notas) if notas else "✅ Datos Cuadrados",
     }
 
 
@@ -188,6 +195,28 @@ def _build_mensaje(cierre: dict, ventas: list, alertas: dict) -> str:
 
     return msg
 
+def _build_mensaje_categorias(cierre: dict, ventas: list) -> str:
+    """Construye un mensaje detallado por categorías de venta."""
+    categorias = {}
+    for v in ventas:
+        cat = v["categoria"]
+        categorias[cat] = categorias.get(cat, 0) + v["monto"]
+    
+    # Ordenar por monto descendente
+    cat_sorted = sorted(categorias.items(), key=lambda x: x[1], reverse=True)
+    
+    total_items = sum(v["cantidad"] for v in ventas)
+    
+    txt = f"<b>📦 DETALLE POR CATEGORÍAS #{cierre['documento_id']}</b>\n"
+    txt += f"📅 Fecha: {cierre['fecha']}\n"
+    txt += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    for cat, monto in cat_sorted:
+        txt += f"  • <b>{cat}:</b> C$ {monto:,.2f}\n"
+    txt += "━━━━━━━━━━━━━━━━━━━━━━\n"
+    txt += f"🛒 Total Artículos: {total_items}"
+    
+    return txt
+
 
 # ─── Main ─────────────────────────────────────────────────────────────────────
 
@@ -227,9 +256,13 @@ def procesar_cierre(cierre_pdf: str, ventas_pdf: str) -> dict:
 
     # 4. Enviar a Telegram Admin
     mensaje = _build_mensaje(cierre, ventas, alertas)
+    mensaje_cat = _build_mensaje_categorias(cierre, ventas)
+    
     if ADMIN_GROUP_ID:
-        ok = _telegram_send(ADMIN_GROUP_ID, mensaje)
-        logger.info(f"Telegram: {'enviado' if ok else 'error'}")
+        ok1 = _telegram_send(ADMIN_GROUP_ID, mensaje)
+        # Enviamos las categorías como segundo mensaje para no saturar el primero
+        ok2 = _telegram_send(ADMIN_GROUP_ID, mensaje_cat)
+        logger.info(f"Telegram: Resumen={'enviado' if ok1 else 'error'} | Categorías={'enviado' if ok2 else 'error'}")
 
     return {
         "documento_id": cierre["documento_id"],

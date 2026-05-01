@@ -16,28 +16,44 @@ import pdfplumber
 
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 
-def _num(text: str) -> float:
-    """Convierte texto a float. Soporta comas y espacios."""
+import logging
+
+logger = logging.getLogger("parser")
+
+# ─── Helpers ──────────────────────────────────────────────────────────────────
+
+def _num(text: str, context: str = "campo desconocido") -> float:
+    """Convierte texto a float. Si falla, loguea un error con contexto para evitar fallos silenciosos."""
     if not text:
         return 0.0
-    cleaned = text.strip().replace(",", "").replace(" ", "")
+    # Limpieza agresiva: quitar símbolos de moneda, espacios y normalizar comas/puntos
+    cleaned = text.strip().replace("C$", "").replace("$", "").replace(",", "").replace("\xa0", "").replace(" ", "")
+    
     try:
+        if not cleaned: return 0.0
         return float(cleaned)
     except ValueError:
+        logger.error(f"❌ Error de parsing numérico en [{context}]: No se pudo convertir '{text}'")
         return 0.0
-
 
 def _extract_text(pdf_path: str) -> str:
     """Extrae todo el texto de un PDF como string único."""
-    with pdfplumber.open(pdf_path) as pdf:
-        pages = [p.extract_text() or "" for p in pdf.pages]
-    return "\n".join(pages)
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            pages = [p.extract_text() or "" for p in pdf.pages]
+        return "\n".join(pages)
+    except Exception as e:
+        logger.error(f"🚨 Error crítico abriendo PDF {pdf_path}: {e}")
+        raise
 
-
-def _find(pattern: str, text: str, group: int = 1, default: str = "") -> str:
+def _find(pattern: str, text: str, group: int = 1, default: str = "", context: str = "campo") -> str:
     """Busca un patrón y devuelve el grupo capturado o default."""
     m = re.search(pattern, text, re.IGNORECASE | re.MULTILINE)
-    return m.group(group).strip() if m else default
+    if not m:
+        if "id" in context.lower() or "fecha" in context.lower():
+            logger.warning(f"⚠️ No se encontró el {context} usando el patrón: {pattern}")
+        return default
+    return m.group(group).strip()
 
 
 # ─── Parser: CierrePos.pdf ────────────────────────────────────────────────────
@@ -50,46 +66,46 @@ def parse_cierre_pdf(pdf_path: str) -> Dict[str, Any]:
     text = _extract_text(pdf_path)
 
     # Identificación
-    documento_id = _find(r"Documento\s*:\s*(\d+)", text)
-    fecha_str    = _find(r"Fechas\s*:\s*(\d{2}/\d{2}/\d{4})", text)
-    cajero       = _find(r"Cajero\s*:\s*(.+)", text)
-    terminal     = _find(r"Terminal\s*:\s*(.+)", text)
-    fact_desde   = _find(r"Facturas\s*:\s*(\w+)\s*-", text)
-    fact_hasta   = _find(r"Facturas\s*:\s*\w+\s*-\s*(\w+)", text)
-    num_facturas = int(_find(r"#\s*Fact\.\s*:\s*(\d+)", text) or 0)
-    fact_anulas  = int(_find(r"#F\.Anulas\s*:\s*(\d+)", text) or 0)
+    documento_id = _find(r"Documento\s*:\s*(\d+)", text, context="ID del Documento")
+    fecha_str    = _find(r"Fechas\s*:\s*(\d{2}/\d{2}/\d{4})", text, context="Fecha de Cierre")
+    cajero       = _find(r"Cajero\s*:\s*(.+)", text, context="Nombre del Cajero")
+    terminal     = _find(r"Terminal\s*:\s*(.+)", text, context="Terminal POS")
+    fact_desde   = _find(r"Facturas\s*:\s*(\w+)\s*-", text, context="Factura Inicial")
+    fact_hasta   = _find(r"Facturas\s*:\s*\w+\s*-\s*(\w+)", text, context="Factura Final")
+    num_facturas = int(_find(r"#\s*Fact\.\s*:\s*(\d+)", text, context="Cantidad de Facturas") or 0)
+    fact_anulas  = int(_find(r"#F\.Anulas\s*:\s*(\d+)", text, context="Facturas Anuladas") or 0)
 
     # Timestamps (apertura / cierre)
-    apertura_str = _find(r"Apertura\s*:\s*(.+)", text)
-    cierre_str   = _find(r"Cierre\s*:\s*(.+)", text)
+    apertura_str = _find(r"Apertura\s*:\s*(.+)", text, context="Hora Apertura")
+    cierre_str   = _find(r"Cierre\s*:\s*(.+)", text, context="Hora Cierre")
 
     # Datos de venta
-    exonerado = _num(_find(r"Exonerado\s*:\s*([\d,.\-]+)", text))
-    gravado   = _num(_find(r"Gravado\s*:\s*([\d,.\-]+)", text))
-    subtotal  = _num(_find(r"Subtotal\s*:\s*([\d,.\-]+)", text))
-    descuento = _num(_find(r"Descuento\s*:\s*([\d,.\-]+)", text))
-    iva       = _num(_find(r"IVA\s*:\s*([\d,.\-]+)", text))
-    propina   = _num(_find(r"Propina\s*:\s*([\d,.\-]+)", text))
-    v_total   = _num(_find(r"V\.\s*Total\s*:\s*([\d,.\-]+)", text))
+    exonerado = _num(_find(r"Exonerado\s*:\s*([\d,.\-]+)", text), context="Monto Exonerado")
+    gravado   = _num(_find(r"Gravado\s*:\s*([\d,.\-]+)", text), context="Monto Gravado")
+    subtotal  = _num(_find(r"Subtotal\s*:\s*([\d,.\-]+)", text), context="Subtotal")
+    descuento = _num(_find(r"Descuento\s*:\s*([\d,.\-]+)", text), context="Descuento")
+    iva       = _num(_find(r"IVA\s*:\s*([\d,.\-]+)", text), context="IVA")
+    propina   = _num(_find(r"Propina\s*:\s*([\d,.\-]+)", text), context="Propina")
+    v_total   = _num(_find(r"V\.\s*Total\s*:\s*([\d,.\-]+)", text), context="Venta Total")
 
     # Efectivo
-    efect_cds = _num(_find(r"Fact\. Contado en efectivo\.\s*C\$\s*U\$\s*([\d,.\-]+)", text))
-    efect_usd = _num(_find(r"Fact\. Contado en efectivo\.\s*C\$\s*U\$\s*[\d,.\-]+\s+([\d,.\-]+)", text))
+    efect_cds = _num(_find(r"Fact\. Contado en efectivo\.\s*C\$\s*U\$\s*([\d,.\-]+)", text), context="Efectivo en Córdobas")
+    efect_usd = _num(_find(r"Fact\. Contado en efectivo\.\s*C\$\s*U\$\s*[\d,.\-]+\s+([\d,.\-]+)", text), context="Efectivo en USD")
 
     # Tarjetas y transferencias
-    tarjetas_total      = _num(_find(r"Total Tarjetas C\$\s*:\s*([\d,.\-]+)", text))
-    transferencias_total = _num(_find(r"Total Ot\. Mtdos\s*:\s*([\d,.\-]+)\s+([\d,.\-]+)", text))
+    tarjetas_total      = _num(_find(r"Total Tarjetas C\$\s*:\s*([\d,.\-]+)", text), context="Total Tarjetas")
+    transferencias_total = _num(_find(r"Total Ot\. Mtdos\s*:\s*([\d,.\-]+)\s+([\d,.\-]+)", text), context="Total Transferencias")
 
     # Conteo de efectivo
-    conteo_cds = _num(_find(r"Total Conteo Cordobas\s*:\s*([\d,.\-]+)", text))
+    conteo_cds = _num(_find(r"Total Conteo Cordobas\s*:\s*([\d,.\-]+)", text), context="Conteo Físico Córdobas")
 
     # Declaración POS / apertura / auditoría
-    declar_pos  = _num(_find(r"Declaraci[oó]n Cierres P\.O\.S fisico\s*C\$\s*([\d,.\-]+)", text))
-    aper_cust   = _num(_find(r"Efectivo de Apertura/Custodio\s*C\$\s*([\d,.\-]+)", text))
-    faltante    = _num(_find(r"Faltante\s*:\s*([\d,.\-]+)", text))
-    sobrante    = _num(_find(r"Sobrante\s*:\s*([\d,.\-]+)", text))
-    dif_pos     = _num(_find(r"Diferenc\.\s*P\.O\.S\s*:\s*([\d,.\-]+)", text))
-    tipo_cambio = _num(_find(r"Tipo Cambio\s*:\s*([\d,.\-]+)", text))
+    declar_pos  = _num(_find(r"Declaraci[oó]n Cierres P\.O\.S fisico\s*C\$\s*([\d,.\-]+)", text), context="Declaración POS")
+    aper_cust   = _num(_find(r"Efectivo de Apertura/Custodio\s*C\$\s*([\d,.\-]+)", text), context="Fondo Custodio")
+    faltante    = _num(_find(r"Faltante\s*:\s*([\d,.\-]+)", text), context="Faltante de Caja")
+    sobrante    = _num(_find(r"Sobrante\s*:\s*([\d,.\-]+)", text), context="Sobrante de Caja")
+    dif_pos     = _num(_find(r"Diferenc\.\s*P\.O\.S\s*:\s*([\d,.\-]+)", text), context="Diferencia POS")
+    tipo_cambio = _num(_find(r"Tipo Cambio\s*:\s*([\d,.\-]+)", text), context="Tipo de Cambio")
 
     # Convertir fecha DD/MM/YYYY → YYYY-MM-DD para PostgreSQL
     fecha_iso = ""

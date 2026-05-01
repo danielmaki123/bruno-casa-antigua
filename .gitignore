@@ -51,5 +51,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# --- Herramientas internas ---
+# --- Datos locales y temporales ---
+data/
+scratch/
 .omx/
