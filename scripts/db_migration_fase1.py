@@ -1,0 +1,193 @@
+"""
+db_migration_fase1.py — Agrega las 5 tablas nuevas de Fase 1 a PostgreSQL.
+Idempotente: se puede correr múltiples veces sin error.
+NO modifica cierres_caja ni ventas_detalle.
+
+Uso: python scripts/db_migration_fase1.py
+"""
+import os
+import sys
+from pathlib import Path
+
+import psycopg2
+from dotenv import load_dotenv
+
+ROOT = Path(__file__).resolve().parent.parent
+load_dotenv(ROOT / ".env")
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    print("[ERROR] DATABASE_URL no configurado en .env")
+    sys.exit(1)
+
+DDL = """
+CREATE TABLE IF NOT EXISTS conversations (
+    id         SERIAL PRIMARY KEY,
+    chat_id    BIGINT NOT NULL,
+    user_id    BIGINT,
+    user_name  TEXT,
+    role       TEXT NOT NULL,
+    content    TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS areas (
+    id   SERIAL PRIMARY KEY,
+    name VARCHAR(50) UNIQUE NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS products (
+    id           SERIAL PRIMARY KEY,
+    name         VARCHAR(200) NOT NULL,
+    sku_internal VARCHAR(50),
+    unit         VARCHAR(20)  NOT NULL,
+    area_id      INT REFERENCES areas(id),
+    is_active    BOOLEAN DEFAULT TRUE,
+    created_at   TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS stock_rules (
+    id         SERIAL PRIMARY KEY,
+    product_id INT REFERENCES products(id),
+    area_id    INT REFERENCES areas(id),
+    min_qty    NUMERIC(10,2) NOT NULL,
+    target_qty NUMERIC(10,2),
+    UNIQUE(product_id, area_id)
+);
+
+CREATE TABLE IF NOT EXISTS inventory_counts (
+    id          SERIAL PRIMARY KEY,
+    date        DATE NOT NULL,
+    area_id     INT REFERENCES areas(id),
+    product_id  INT REFERENCES products(id),
+    counted_qty NUMERIC(10,2) NOT NULL,
+    reported_by TEXT,
+    source      VARCHAR(20) DEFAULT 'sheets',
+    created_at  TIMESTAMP DEFAULT NOW(),
+    UNIQUE(date, product_id, source)
+);
+
+CREATE INDEX IF NOT EXISTS idx_conversations_chat ON conversations(chat_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_inventory_date     ON inventory_counts(date, area_id);
+"""
+
+AREAS = ["bebidas", "cocina", "barra", "sushi", "birria", "pizza"]
+
+# (name, unit, area_name, min_qty, target_qty)
+PRODUCTS = [
+    # bebidas
+    ("Toña",                  "unidades", "bebidas",  24, 48),
+    ("Victoria",              "unidades", "bebidas",  24, 48),
+    ("Coca regular",          "unidades", "bebidas",  36, 72),
+    ("Coca cero",             "unidades", "bebidas",  24, 48),
+    ("Fanta naranja",         "unidades", "bebidas",  18, 36),
+    ("Fanta roja",            "unidades", "bebidas",  18, 36),
+    ("Agua purificada",       "unidades", "bebidas",  30, 60),
+    ("Agua gasificada limón", "unidades", "bebidas",  12, 24),
+    ("Heineken",              "unidades", "bebidas",  18, 36),
+    ("Miller",                "unidades", "bebidas",  18, 36),
+    ("Toña Lite",             "unidades", "bebidas",  24, 48),
+    ("Victoria Frost",        "unidades", "bebidas",  18, 36),
+    ("Hard Limón",            "unidades", "bebidas",  12, 24),
+    ("Hard Raspberry",        "unidades", "bebidas",  12, 24),
+    ("Jugo de naranja",       "galones",  "bebidas",   3,  6),
+    ("Jugo de limón",         "galones",  "bebidas",   2,  4),
+    ("Jamaica",               "galones",  "bebidas",   2,  4),
+    # barra
+    ("Flor de Caña 12",       "botellas", "barra",     3,  6),
+    ("Flor de Caña 18",       "botellas", "barra",     2,  4),
+    ("Flor de Caña Gran Reserva", "botellas", "barra", 3,  6),
+    ("Extra Lite litro",      "botellas", "barra",     4,  8),
+    ("José Cuervo",           "botellas", "barra",     3,  6),
+    ("Vodkalla",              "botellas", "barra",     3,  6),
+    ("Triple sec",            "botellas", "barra",     2,  4),
+    ("Vino tinto Tavernello", "botellas", "barra",     4,  8),
+    ("Aperol",                "botellas", "barra",     2,  4),
+    ("Granadine",             "botellas", "barra",     2,  4),
+    # cocina
+    ("Flan",                  "porciones", "cocina",   8, 16),
+    ("Red velvet",            "porciones", "cocina",   6, 12),
+    ("Tres leches",           "porciones", "cocina",   8, 16),
+    ("Cheesecake de limón",   "porciones", "cocina",   6, 12),
+    # sushi (insumos básicos para arrancar)
+    ("Arroz para sushi",      "kg",        "sushi",    5, 10),
+    ("Nori",                  "paquetes",  "sushi",    2,  5),
+    ("Salmón",                "kg",        "sushi",    2,  4),
+    # birria
+    ("Carne de res",          "kg",        "birria",   5, 10),
+    ("Tortillas",             "paquetes",  "birria",  10, 20),
+    # pizza
+    ("Harina pizza",          "kg",        "pizza",    5, 10),
+    ("Queso mozzarella",      "kg",        "pizza",    3,  6),
+    ("Salsa de tomate",       "litros",    "pizza",    2,  4),
+]
+
+
+def run_migration(conn):
+    cur = conn.cursor()
+    print("[DB] Creando tablas Fase 1...")
+    cur.execute(DDL)
+
+    print("[DB] Seeding areas...")
+    for area in AREAS:
+        cur.execute(
+            "INSERT INTO areas (name) VALUES (%s) ON CONFLICT (name) DO NOTHING",
+            (area,),
+        )
+
+    print("[DB] Seeding products + stock_rules...")
+    for name, unit, area_name, min_qty, target_qty in PRODUCTS:
+        cur.execute("SELECT id FROM areas WHERE name = %s", (area_name,))
+        row = cur.fetchone()
+        if not row:
+            continue
+        area_id = row[0]
+
+        cur.execute(
+            """
+            INSERT INTO products (name, unit, area_id)
+            VALUES (%s, %s, %s)
+            ON CONFLICT DO NOTHING
+            RETURNING id
+            """,
+            (name, unit, area_id),
+        )
+        result = cur.fetchone()
+        if not result:
+            cur.execute("SELECT id FROM products WHERE name = %s AND area_id = %s", (name, area_id))
+            result = cur.fetchone()
+        if not result:
+            continue
+        product_id = result[0]
+
+        cur.execute(
+            """
+            INSERT INTO stock_rules (product_id, area_id, min_qty, target_qty)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (product_id, area_id) DO NOTHING
+            """,
+            (product_id, area_id, min_qty, target_qty),
+        )
+
+    conn.commit()
+    cur.close()
+
+
+def main():
+    print(f"[DB] Conectando a PostgreSQL...")
+    try:
+        conn = psycopg2.connect(DATABASE_URL)
+        run_migration(conn)
+        conn.close()
+        print("[OK] Migración Fase 1 completa:")
+        print("     Tablas: conversations, areas, products, stock_rules, inventory_counts")
+        print(f"    Areas seed: {', '.join(AREAS)}")
+        print(f"    Productos seed: {len(PRODUCTS)}")
+        print("     Índices: idx_conversations_chat, idx_inventory_date")
+    except Exception as e:
+        print(f"[ERROR] {e}")
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
