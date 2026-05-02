@@ -10,7 +10,8 @@ from bot.config import (
     GROUP_ID_INVENTARIO,
     GROUP_ID_TEAM,
 )
-from bot.llm import classify_intent
+from bot.llm import classify_intent, humanize
+from skills import cierres, inventario, ventas
 
 logger = logging.getLogger(__name__)
 
@@ -69,15 +70,48 @@ def _help_text(chat_id: int) -> str:
     return _HELP["admin"]
 
 
-def _route(intent: str, entities: dict, chat_id: int) -> str:
+def _route(intent: str, entities: dict, chat_id: int, user_name: str = "") -> str:
     if intent == "help":
         return _help_text(chat_id)
-    if intent in ("sales_today", "sales_by_date", "top_products"):
-        return "⚠️ Módulo de ventas en construcción."
+
+    if intent == "sales_today":
+        data = ventas.ventas_dia()
+        return humanize(data, context="consulta de ventas del día")
+
+    if intent == "sales_by_date":
+        fecha = entities.get("date") or entities.get("fecha")
+        data = ventas.ventas_dia(fecha)
+        return humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}")
+
+    if intent == "top_products":
+        rango = entities.get("period", "semana")
+        data = ventas.top_productos(rango)
+        return humanize({"top_productos": data, "rango": rango}, context="ranking de productos")
+
     if intent == "closing_status":
-        return "⚠️ Módulo de cierres en construcción."
-    if intent in ("stock_check", "stock_report", "stock_alerts"):
-        return "⚠️ Módulo de inventario en construcción."
+        fecha = entities.get("date") or entities.get("fecha")
+        data = cierres.cierre_status(fecha)
+        return humanize(data, context="estado de cierre de caja")
+
+    if intent == "stock_check":
+        area = entities.get("area")
+        data = inventario.stock_check(area)
+        return humanize(data, context=f"stock de inventario{' - ' + area if area else ''}")
+
+    if intent == "stock_report":
+        result = inventario.registrar_movimiento(entities, user_name)
+        if result.get("ok"):
+            prod = result.get("producto", "")
+            qty = result.get("cantidad_movimiento", 0)
+            nuevo = result.get("stock_nuevo", 0)
+            return f"✅ Registrado: {qty} {prod} — {user_name}. Stock actual: {nuevo}"
+        return result.get("mensaje") or "⚠️ No pude registrar el movimiento."
+
+    if intent == "stock_alerts":
+        area = entities.get("area")
+        alertas = inventario.check_alerts(area)
+        return humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo")
+
     return "No entendí tu consulta. Escribí /help para ver qué puedo hacer."
 
 
@@ -186,6 +220,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         memory.save(chat_id, None, "Bruno", "assistant", response)
         return
 
-    response = _route(intent, entities, chat_id)
+    response = _route(intent, entities, chat_id, user_name=user.full_name)
     await update.message.reply_text(response)
     memory.save(chat_id, None, "Bruno", "assistant", response)
