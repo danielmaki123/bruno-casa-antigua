@@ -1,8 +1,10 @@
+import asyncio
 import logging
 
+from aiohttp import web
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
-from bot.config import TELEGRAM_BOT_TOKEN
+from bot.config import TELEGRAM_BOT_TOKEN, WEBHOOK_PORT
 from bot.handlers import (
     cmd_alertas,
     cmd_cierre,
@@ -12,6 +14,7 @@ from bot.handlers import (
     cmd_ventas,
     handle_message,
 )
+from bot.webhook import create_app
 
 logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
@@ -20,21 +23,38 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-def main() -> None:
+async def main() -> None:
     logger.info("Bruno iniciando...")
-    app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(CommandHandler(["help", "ayuda"], cmd_help))
-    app.add_handler(CommandHandler("ventas", cmd_ventas))
-    app.add_handler(CommandHandler("cierre", cmd_cierre))
-    app.add_handler(CommandHandler("inventario", cmd_inventario))
-    app.add_handler(CommandHandler("alertas", cmd_alertas))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    telegram_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
-    logger.info("Polling activo. Esperando mensajes.")
-    app.run_polling()
+    telegram_app.add_handler(CommandHandler("start", cmd_start))
+    telegram_app.add_handler(CommandHandler(["help", "ayuda"], cmd_help))
+    telegram_app.add_handler(CommandHandler("ventas", cmd_ventas))
+    telegram_app.add_handler(CommandHandler("cierre", cmd_cierre))
+    telegram_app.add_handler(CommandHandler("inventario", cmd_inventario))
+    telegram_app.add_handler(CommandHandler("alertas", cmd_alertas))
+    telegram_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+
+    http_app = create_app(telegram_app)
+    runner = web.AppRunner(http_app)
+    await runner.setup()
+    site = web.TCPSite(runner, "0.0.0.0", WEBHOOK_PORT)
+    await site.start()
+    logger.info(f"HTTP server en puerto {WEBHOOK_PORT}")
+
+    async with telegram_app:
+        await telegram_app.start()
+        await telegram_app.updater.start_polling()
+        logger.info("Polling activo. Esperando mensajes.")
+        try:
+            await asyncio.Event().wait()
+        finally:
+            await telegram_app.updater.stop()
+            await telegram_app.stop()
+
+    await runner.cleanup()
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())
