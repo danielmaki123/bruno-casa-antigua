@@ -2,7 +2,8 @@ python-dotenv
 google-auth
 google-auth-oauthlib
 google-api-python-client
-python-telegram-bot
+python-telegram-bot[job-queue]
+aiohttp
 pandas
 openai
 httpx
