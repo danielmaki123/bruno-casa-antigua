@@ -140,7 +140,7 @@ async def handle_resumen_semanal(request: web.Request) -> web.Response:
 
 
 def create_app(telegram_app) -> web.Application:
-    app = web.Application()
+    app = web.Application(client_max_size=20 * 1024 * 1024)  # 20MB for PDF base64 payloads
     app["telegram_app"] = telegram_app
     app.router.add_get("/health", handle_health)
     app.router.add_post("/webhook/cierre", handle_cierre)
