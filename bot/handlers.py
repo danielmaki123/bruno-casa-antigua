@@ -146,7 +146,10 @@ async def cmd_ventas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not _financial_ok(chat_id):
         await update.message.reply_text("⚠️ Comando disponible solo en Administrativo o privado.")
         return
-    await update.message.reply_text("⚠️ Módulo de ventas en construcción.")
+    fecha = context.args[0] if context.args else None
+    data = ventas.ventas_dia(fecha)
+    response = humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}")
+    await update.message.reply_text(response)
 
 
 async def cmd_cierre(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -159,7 +162,10 @@ async def cmd_cierre(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     if not _financial_ok(chat_id):
         await update.message.reply_text("⚠️ Comando disponible solo en Administrativo o privado.")
         return
-    await update.message.reply_text("⚠️ Módulo de cierres en construcción.")
+    fecha = context.args[0] if context.args else None
+    data = cierres.cierre_status(fecha)
+    response = humanize(data, context="estado de cierre de caja")
+    await update.message.reply_text(response)
 
 
 async def cmd_inventario(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -172,7 +178,10 @@ async def cmd_inventario(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not _stock_ok(chat_id):
         await update.message.reply_text("⚠️ Comando no disponible en este grupo.")
         return
-    await update.message.reply_text("⚠️ Módulo de inventario en construcción.")
+    area = context.args[0] if context.args else None
+    data = inventario.stock_check(area)
+    response = humanize(data, context=f"stock de inventario{' - ' + area if area else ''}")
+    await update.message.reply_text(response)
 
 
 async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -185,7 +194,10 @@ async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not _stock_ok(chat_id):
         await update.message.reply_text("⚠️ Comando no disponible en este grupo.")
         return
-    await update.message.reply_text("⚠️ Módulo de alertas en construcción.")
+    area = context.args[0] if context.args else None
+    alertas = inventario.check_alerts(area)
+    response = humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo")
+    await update.message.reply_text(response)
 
 
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
