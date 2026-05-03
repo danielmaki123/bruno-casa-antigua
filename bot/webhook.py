@@ -121,9 +121,71 @@ async def handle_sheets(request: web.Request) -> web.Response:
         return web.json_response({"error": "Invalid JSON"}, status=400)
 
     rows = body.get("rows", [])
-    logger.info(f"Webhook /sheets: {len(rows)} filas recibidas")
-    # Sheets sync implementado en Fase 2
-    return web.json_response({"ok": True, "synced": 0, "note": "sheets sync pending Fase 2"})
+    fecha = body.get("fecha")
+    logger.info(f"Webhook /sheets: {len(rows)} filas, fecha={fecha}")
+
+    if not rows:
+        return web.json_response({"ok": True, "synced": 0})
+
+    from database.postgres import execute_query
+    import datetime as dt
+
+    sync_date = fecha or str(dt.date.today())
+    synced = 0
+    skipped = 0
+
+    for row in rows:
+        producto = str(row.get("producto") or row.get("product") or "").strip()
+        area_name = str(row.get("area") or "").strip().lower()
+        cantidad = row.get("cantidad") or row.get("quantity")
+
+        if not producto or cantidad is None:
+            skipped += 1
+            continue
+
+        try:
+            cantidad = float(cantidad)
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+
+        try:
+            product_rows = execute_query(
+                """
+                SELECT p.id, p.area_id FROM products p
+                JOIN areas a ON a.id = p.area_id
+                WHERE p.is_active = TRUE
+                  AND LOWER(p.name) ILIKE LOWER(%s)
+                  AND (%s = '' OR LOWER(a.name) = %s)
+                LIMIT 1
+                """,
+                (f"%{producto}%", area_name, area_name),
+                fetch=True,
+            )
+            if not product_rows:
+                logger.warning(f"Sheets sync: producto no encontrado '{producto}'")
+                skipped += 1
+                continue
+
+            product_id = product_rows[0]["id"]
+            area_id = product_rows[0]["area_id"]
+
+            execute_query(
+                """
+                INSERT INTO inventory_counts (date, area_id, product_id, counted_qty, reported_by, source)
+                VALUES (%s, %s, %s, %s, 'sheets', 'sheets')
+                ON CONFLICT (date, product_id, source) DO UPDATE
+                    SET counted_qty = EXCLUDED.counted_qty
+                """,
+                (sync_date, area_id, product_id, cantidad),
+            )
+            synced += 1
+        except Exception as e:
+            logger.error(f"Sheets sync row error ({producto}): {e}")
+            skipped += 1
+
+    logger.info(f"Sheets sync completo: {synced} guardados, {skipped} omitidos")
+    return web.json_response({"ok": True, "synced": synced, "skipped": skipped, "fecha": sync_date})
 
 
 async def handle_resumen_semanal(request: web.Request) -> web.Response:
