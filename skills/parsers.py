@@ -25,19 +25,33 @@ def parse_cierre_pdf(pdf_path):
     except:
         fecha_iso = datetime.now().strftime("%Y-%m-%d")
 
+    v_total = float(find_val(r"V\.\s*Total\s*:\s*([\d,.]+)"))
+    propina = float(find_val(r"Propina\s*:\s*([\d,.]+)"))
+    subtotal_raw = find_val(r"Sub\s*[Tt]otal\s*:\s*([\d,.]+)")
+    subtotal = float(subtotal_raw) if subtotal_raw != "0" else (v_total - propina)
+
     return {
         "documento_id": find_val(r"Documento:\s*(\d+)"),
         "fecha": fecha_iso,
         "cajero": find_val(r"Cajero\s*:\s*(.*)"),
-        "v_total": float(find_val(r"V\.\s*Total\s*:\s*([\d,.]+)")),
+        "terminal": find_val(r"Terminal\s*:\s*(.+)"),
+        "num_facturas": int(find_val(r"#\s*Fact\.\s*:\s*(\d+)") or 0),
+        "facturas_anuladas": int(find_val(r"#F\.Anulas\s*:\s*(\d+)") or 0),
+        "apertura": find_val(r"Apertura\s*:\s*(.+)"),
+        "cierre": find_val(r"Cierre\s*:\s*(.+)"),
+        "subtotal": subtotal,
+        "propina": propina,
+        "v_total": v_total,
+        "descuento": float(find_val(r"Descuento\s*:\s*([\d,.]+)")),
+        "iva": float(find_val(r"IVA\s*:\s*([\d,.]+)")),
+        "efectivo_cds": float(find_val(r"Total\s*C\$\s*:\s*(-?[\d,.]+)").lstrip("-") or 0),
         "tarjetas_total": float(find_val(r"Total\s*Tarjetas\s*C\$:\s*([\d,.]+)")),
-        "propina": float(find_val(r"Propina\s*:\s*([\d,.]+)")),
         "exonerado": float(find_val(r"Exonerado:\s*([\d,.]+)")),
         "transferencias_total": float(find_val(r"TIPO\s*:TRANSFERENCIA\s*([\d,.]+)")),
         "diferencia_pos": float(find_val(r"Diferenc\.\s*P\.O\.S\s*:\s*([-\d,.]+)")),
         "faltante": float(find_val(r"Faltante\s*:\s*([\d,.]+)")),
         "sobrante": float(find_val(r"Sobrante\s*:\s*([\d,.]+)")),
-        "tipo_cambio": float(find_val(r"Tipo\s*Cambio\s*:\s*([\d,.]+)") or 0) or 36.62
+        "tipo_cambio": float(find_val(r"Tipo\s*Cambio\s*:\s*([\d,.]+)") or 0) or 36.62,
     }
 
 def parse_ventas_pdf(pdf_path):
