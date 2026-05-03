@@ -21,7 +21,7 @@ import requests
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 
-WEBHOOK_URL   = os.getenv("WEBHOOK_URL", "http://localhost:8080/webhook/cierre/pdf")
+WEBHOOK_URL   = os.getenv("WEBHOOK_URL", "http://localhost:8080/webhook/cierre/pdf?silent=1")
 WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
 TOKEN_FILE    = os.getenv("GOOGLE_TOKEN_FILE", "/app/token.json")
 SCOPES        = ["https://www.googleapis.com/auth/gmail.readonly"]

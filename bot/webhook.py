@@ -101,12 +101,14 @@ async def handle_cierre_pdf(request: web.Request) -> web.Response:
 
     resultado = cierres.procesar_cierre_nuevo(cierre_data, ventas_data)
 
-    telegram_app = request.app["telegram_app"]
-    mensaje = humanize(resultado, context="nuevo cierre de caja procesado")
-    try:
-        await telegram_app.bot.send_message(chat_id=GROUP_ID_ADMIN, text=mensaje)
-    except Exception as e:
-        logger.error(f"handle_cierre_pdf send_message error: {e}")
+    silent = request.rel_url.query.get("silent", "0") == "1"
+    if not silent and not resultado.get("duplicado"):
+        telegram_app = request.app["telegram_app"]
+        mensaje = humanize(resultado, context="nuevo cierre de caja procesado")
+        try:
+            await telegram_app.bot.send_message(chat_id=GROUP_ID_ADMIN, text=mensaje)
+        except Exception as e:
+            logger.error(f"handle_cierre_pdf send_message error: {e}")
 
     return web.json_response({"ok": True, "documento_id": cierre_data.get("documento_id")})
 
