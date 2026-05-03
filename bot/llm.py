@@ -35,7 +35,10 @@ Ejemplos:
 {{"intent": "stock_report", "entities": {{"product": "coca cola", "quantity": 10, "action": "entry"}}}}
 """
 
-_CURRENCY_NOTE = "\nIMPORTANTE: La moneda es Córdobas nicaragüenses (C$). Nunca uses MXN, USD ni ninguna otra moneda."
+_CURRENCY_NOTE = (
+    "\nIMPORTANTE: La moneda es Córdobas nicaragüenses (C$). Nunca uses MXN, USD ni ninguna otra moneda."
+    "\nFORMATO: Respuestas cortas, máximo 5 líneas. Usa saltos de línea para separar datos. Sin párrafos largos."
+)
 
 
 def _load_soul() -> str:
