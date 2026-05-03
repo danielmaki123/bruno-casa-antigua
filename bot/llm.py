@@ -6,6 +6,7 @@ from pathlib import Path
 from openai import OpenAI
 
 from bot.config import KIMI_API_KEY, KIMI_BASE_URL, KIMI_MODEL
+from bot.memory import get_recent
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +25,7 @@ Intents válidos:
 - stock_check: consulta de stock de producto o área ("/inventario", "stock bebidas", "cuánta cerveza hay")
 - stock_report: entrada o salida de inventario ("llegaron 10 cajas de coca", "se acabó el vodka")
 - stock_alerts: lista de alertas de stock bajo ("/alertas")
+- weekly_order: sugerencia de pedido semanal por proveedor ("pedido de la semana", "que hay que pedir", "pedido miercoles")
 - help: ayuda o lista de comandos ("/help", "/ayuda")
 - unknown: cualquier otro mensaje
 
@@ -47,6 +49,7 @@ Ejemplos variados (lenguaje natural nicaragüense):
 "cuánta toña hay?" → {{"intent": "stock_check", "entities": {{"product": "toña"}}}}
 "se acabó el vodka" → {{"intent": "stock_report", "entities": {{"product": "vodka", "quantity": 0, "action": "exit"}}}}
 "llegaron 2 cajas de cerveza" → {{"intent": "stock_report", "entities": {{"product": "cerveza", "quantity": 2, "action": "entry"}}}}
+"pedido de la semana" → {{"intent": "weekly_order", "entities": {{}}}}
 """
 
 _CURRENCY_NOTE = (
@@ -103,19 +106,26 @@ def classify_intent(message: str) -> dict:
         return {"intent": "unknown", "entities": {}}
 
 
-def humanize(data: dict, context: str = "") -> str:
+def humanize(data: dict, context: str = "", chat_id: int | None = None) -> str:
     prompt = f"Datos: {json.dumps(data, ensure_ascii=False, default=str)}"
     if context:
         prompt += f"\nContexto: {context}"
+
+    messages = [{"role": "system", "content": _SOUL + _CURRENCY_NOTE}]
+    if chat_id is not None:
+        recent = get_recent(chat_id, limit=5)
+        for msg in recent:
+            role = msg.get("role")
+            content = msg.get("content")
+            if role in {"user", "assistant", "system"} and content:
+                messages.append({"role": role, "content": str(content)})
+    messages.append({"role": "user", "content": prompt})
 
     try:
         response = _client.chat.completions.create(
             model=KIMI_MODEL,
             temperature=0.7,
-            messages=[
-                {"role": "system", "content": _SOUL + _CURRENCY_NOTE},
-                {"role": "user", "content": prompt},
-            ],
+            messages=messages,
         )
         return response.choices[0].message.content.strip()
     except Exception as e:

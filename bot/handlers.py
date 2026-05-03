@@ -58,6 +58,7 @@ _INTENT_PERM = {
     "stock_check": _stock_ok,
     "stock_report": _stock_ok,
     "stock_alerts": _stock_ok,
+    "weekly_order": _stock_ok,
 }
 
 
@@ -77,33 +78,33 @@ def _route(intent: str, entities: dict, chat_id: int, user_name: str = "") -> st
 
     if intent == "sales_today":
         data = ventas.ventas_dia()
-        return humanize(data, context="consulta de ventas del día")
+        return humanize(data, context="consulta de ventas del día", chat_id=chat_id)
 
     if intent == "sales_by_date":
         fecha = entities.get("date") or entities.get("fecha")
         data = ventas.ventas_dia(fecha)
-        return humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}")
+        return humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}", chat_id=chat_id)
 
     if intent == "sales_by_month":
         year = int(entities.get("year") or dt.date.today().year)
         month = int(entities.get("month") or dt.date.today().month)
         data = ventas.ventas_mes(year, month)
-        return humanize(data, context=f"resumen mensual de ventas {month}/{year}")
+        return humanize(data, context=f"resumen mensual de ventas {month}/{year}", chat_id=chat_id)
 
     if intent == "top_products":
         rango = entities.get("period", "semana")
         data = ventas.top_productos(rango)
-        return humanize({"top_productos": data, "rango": rango}, context="ranking de productos")
+        return humanize({"top_productos": data, "rango": rango}, context="ranking de productos", chat_id=chat_id)
 
     if intent == "closing_status":
         fecha = entities.get("date") or entities.get("fecha")
         data = cierres.cierre_status(fecha)
-        return humanize(data, context="estado de cierre de caja")
+        return humanize(data, context="estado de cierre de caja", chat_id=chat_id)
 
     if intent == "stock_check":
         area = entities.get("area")
         data = inventario.stock_check(area)
-        return humanize(data, context=f"stock de inventario{' - ' + area if area else ''}")
+        return humanize(data, context=f"stock de inventario{' - ' + area if area else ''}", chat_id=chat_id)
 
     if intent == "stock_report":
         result = inventario.registrar_movimiento(entities, user_name)
@@ -117,7 +118,11 @@ def _route(intent: str, entities: dict, chat_id: int, user_name: str = "") -> st
     if intent == "stock_alerts":
         area = entities.get("area")
         alertas = inventario.check_alerts(area)
-        return humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo")
+        return humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo", chat_id=chat_id)
+
+    if intent == "weekly_order":
+        data = inventario.pedido_semanal()
+        return humanize(data, context="pedido semanal sugerido por proveedor para miercoles", chat_id=chat_id)
 
     return "No entendí tu consulta. Escribí /help para ver qué puedo hacer."
 
@@ -155,7 +160,7 @@ async def cmd_ventas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     fecha = context.args[0] if context.args else None
     data = ventas.ventas_dia(fecha)
-    response = humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}")
+    response = humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}", chat_id=chat_id)
     await update.message.reply_text(response)
 
 
@@ -171,7 +176,7 @@ async def cmd_cierre(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     fecha = context.args[0] if context.args else None
     data = cierres.cierre_status(fecha)
-    response = humanize(data, context="estado de cierre de caja")
+    response = humanize(data, context="estado de cierre de caja", chat_id=chat_id)
     await update.message.reply_text(response)
 
 
@@ -187,7 +192,7 @@ async def cmd_inventario(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         return
     area = context.args[0] if context.args else None
     data = inventario.stock_check(area)
-    response = humanize(data, context=f"stock de inventario{' - ' + area if area else ''}")
+    response = humanize(data, context=f"stock de inventario{' - ' + area if area else ''}", chat_id=chat_id)
     await update.message.reply_text(response)
 
 
@@ -203,7 +208,7 @@ async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     area = context.args[0] if context.args else None
     alertas = inventario.check_alerts(area)
-    response = humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo")
+    response = humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo", chat_id=chat_id)
     await update.message.reply_text(response)
 
 
@@ -218,7 +223,8 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     logger.info(f"[{chat_id}] {user.full_name} ({user.id}): {text!r}")
 
     if chat_id == GROUP_ID_TEAM:
-        await update.message.reply_text(_HELP["team"])
+        if text.strip().startswith("/"):
+            await update.message.reply_text(_HELP["team"])
         return
 
     if user.id not in AUTHORIZED_USERS:

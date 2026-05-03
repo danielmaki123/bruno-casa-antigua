@@ -6,7 +6,7 @@ import time
 
 from aiohttp import web
 
-from bot.config import GROUP_ID_ADMIN, WEBHOOK_SECRET
+from bot.config import GROUP_ID_ADMIN, GROUP_ID_INVENTARIO, WEBHOOK_SECRET
 from bot.llm import humanize
 from skills import cierres, ventas
 from skills.parsers import parse_cierre_pdf, parse_ventas_pdf
@@ -138,10 +138,20 @@ async def handle_sheets(request: web.Request) -> web.Response:
 
     for row in rows:
         producto = str(row.get("producto") or row.get("product") or "").strip()
+        external_id = str(
+            row.get("external_id")
+            or row.get("codigo")
+            or row.get("code")
+            or ""
+        ).strip()
         area_name = str(row.get("area") or "").strip().lower()
         cantidad = row.get("cantidad") or row.get("quantity")
+        tipo = str(row.get("tipo") or row.get("type") or "count").strip().lower()
+        stock_min = row.get("stock_min")
+        responsable = str(row.get("responsable") or row.get("usuario") or "sheets").strip() or "sheets"
+        source = str(row.get("source") or "sheets").strip() or "sheets"
 
-        if not producto or cantidad is None:
+        if (not producto and not external_id) or cantidad is None:
             skipped += 1
             continue
 
@@ -157,33 +167,64 @@ async def handle_sheets(request: web.Request) -> web.Response:
                 SELECT p.id, p.area_id FROM products p
                 JOIN areas a ON a.id = p.area_id
                 WHERE p.is_active = TRUE
-                  AND LOWER(p.name) ILIKE LOWER(%s)
+                  AND (
+                    (%s <> '' AND p.external_id = %s)
+                    OR LOWER(p.name) ILIKE LOWER(%s)
+                  )
                   AND (%s = '' OR LOWER(a.name) = %s)
                 LIMIT 1
                 """,
-                (f"%{producto}%", area_name, area_name),
+                (external_id, external_id, f"%{producto}%", area_name, area_name),
                 fetch=True,
             )
             if not product_rows:
-                logger.warning(f"Sheets sync: producto no encontrado '{producto}'")
+                logger.warning(f"Sheets sync: producto no encontrado '{producto or external_id}'")
                 skipped += 1
                 continue
 
             product_id = product_rows[0]["id"]
             area_id = product_rows[0]["area_id"]
 
-            execute_query(
-                """
-                INSERT INTO inventory_counts (date, area_id, product_id, counted_qty, reported_by, source)
-                VALUES (%s, %s, %s, %s, 'sheets', 'sheets')
-                ON CONFLICT (date, product_id, source) DO UPDATE
-                    SET counted_qty = EXCLUDED.counted_qty
-                """,
-                (sync_date, area_id, product_id, cantidad),
-            )
+            if tipo == "entry":
+                execute_query(
+                    """
+                    INSERT INTO inventory_entries (date, product_id, qty, responsable, source)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON CONFLICT (date, product_id, source) DO UPDATE
+                        SET qty = EXCLUDED.qty,
+                            responsable = EXCLUDED.responsable
+                    """,
+                    (sync_date, product_id, cantidad, responsable, source),
+                )
+            else:
+                execute_query(
+                    """
+                    INSERT INTO inventory_counts (date, area_id, product_id, counted_qty, reported_by, source)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (date, product_id, source) DO UPDATE
+                        SET counted_qty = EXCLUDED.counted_qty,
+                            reported_by = EXCLUDED.reported_by
+                    """,
+                    (sync_date, area_id, product_id, cantidad, responsable, source),
+                )
+
+            if stock_min is not None and str(stock_min).strip() != "":
+                try:
+                    min_qty = float(stock_min)
+                    execute_query(
+                        """
+                        INSERT INTO stock_rules (product_id, area_id, min_qty)
+                        VALUES (%s, %s, %s)
+                        ON CONFLICT (product_id, area_id) DO UPDATE
+                            SET min_qty = EXCLUDED.min_qty
+                        """,
+                        (product_id, area_id, min_qty),
+                    )
+                except (TypeError, ValueError):
+                    logger.warning(f"Sheets sync: stock_min inválido para '{producto or external_id}'")
             synced += 1
         except Exception as e:
-            logger.error(f"Sheets sync row error ({producto}): {e}")
+            logger.error(f"Sheets sync row error ({producto or external_id}): {e}")
             skipped += 1
 
     logger.info(f"Sheets sync completo: {synced} guardados, {skipped} omitidos")
@@ -236,6 +277,24 @@ async def handle_resumen_semanal(request: web.Request) -> web.Response:
     return web.json_response({"ok": True})
 
 
+async def handle_pedido_semanal(request: web.Request) -> web.Response:
+    if not _auth_ok(request):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    from skills import inventario as inv
+
+    data = inv.pedido_semanal()
+    mensaje = humanize(data, context="pedido semanal sugerido por proveedor para miercoles")
+    telegram_app = request.app["telegram_app"]
+    try:
+        await telegram_app.bot.send_message(chat_id=GROUP_ID_INVENTARIO, text=mensaje)
+    except Exception as e:
+        logger.error(f"handle_pedido_semanal send_message error: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+    return web.json_response({"ok": True, "proveedores": len(data)})
+
+
 def create_app(telegram_app) -> web.Application:
     app = web.Application(client_max_size=20 * 1024 * 1024)  # 20MB for PDF base64 payloads
     app["telegram_app"] = telegram_app
@@ -245,4 +304,5 @@ def create_app(telegram_app) -> web.Application:
     app.router.add_post("/webhook/sheets", handle_sheets)
     app.router.add_post("/webhook/stock-alerts", handle_stock_alerts)
     app.router.add_get("/cron/resumen-semanal", handle_resumen_semanal)
+    app.router.add_get("/cron/pedido-semanal", handle_pedido_semanal)
     return app

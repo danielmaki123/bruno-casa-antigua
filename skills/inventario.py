@@ -225,3 +225,85 @@ def check_alerts(area: str = None) -> list[dict]:
     except Exception as e:
         logger.error(f"check_alerts error: {e}")
         return []
+
+
+def pedido_semanal() -> dict:
+    try:
+        provider_in_products = execute_query(
+            """
+            SELECT 1
+            FROM information_schema.columns
+            WHERE table_name = 'products' AND column_name = 'provider_name'
+            LIMIT 1
+            """,
+            fetch=True,
+        )
+        provider_expr = (
+            "COALESCE(sr.provider_name, p.provider_name, 'Sin proveedor')"
+            if provider_in_products
+            else "COALESCE(sr.provider_name, 'Sin proveedor')"
+        )
+
+        rows = execute_query(
+            f"""
+            WITH latest_stock AS (
+                SELECT DISTINCT ON (ic.product_id)
+                    ic.product_id,
+                    ic.counted_qty AS stock_actual
+                FROM inventory_counts ic
+                ORDER BY ic.product_id, ic.date DESC, ic.id DESC
+            ),
+            week_counts AS (
+                SELECT product_id, COALESCE(SUM(counted_qty), 0) AS sum_counts_semana
+                FROM inventory_counts
+                WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY product_id
+            ),
+            week_entries AS (
+                SELECT product_id, COALESCE(SUM(qty), 0) AS sum_entries_semana
+                FROM inventory_entries
+                WHERE date >= CURRENT_DATE - INTERVAL '7 days'
+                GROUP BY product_id
+            )
+            SELECT
+                p.name AS producto,
+                p.unit AS unidad,
+                {provider_expr} AS proveedor,
+                COALESCE(ls.stock_actual, 0) AS stock_actual,
+                COALESCE(sr.min_qty, 0) AS stock_minimo,
+                (COALESCE(wc.sum_counts_semana, 0) - COALESCE(ls.stock_actual, 0) + COALESCE(we.sum_entries_semana, 0)) AS consumo_semana
+            FROM products p
+            LEFT JOIN stock_rules sr ON sr.product_id = p.id AND sr.area_id = p.area_id
+            LEFT JOIN latest_stock ls ON ls.product_id = p.id
+            LEFT JOIN week_counts wc ON wc.product_id = p.id
+            LEFT JOIN week_entries we ON we.product_id = p.id
+            WHERE p.is_active = TRUE
+            ORDER BY proveedor, p.name
+            """,
+            fetch=True,
+        )
+
+        resultado = {}
+        for r in rows or []:
+            stock_actual = float(r["stock_actual"] or 0)
+            stock_minimo = float(r["stock_minimo"] or 0)
+            consumo_semana = float(r["consumo_semana"] or 0)
+            a_pedir = max((consumo_semana + stock_minimo) - stock_actual, 0.0)
+            if a_pedir <= 0:
+                continue
+            proveedor = r["proveedor"] or "Sin proveedor"
+            resultado.setdefault(proveedor, []).append(
+                {
+                    "producto": r["producto"],
+                    "stock_actual": stock_actual,
+                    "stock_minimo": stock_minimo,
+                    "consumo_semana": consumo_semana,
+                    "a_pedir": a_pedir,
+                    "unidad": r["unidad"],
+                }
+            )
+
+        return resultado
+    except Exception as e:
+        logger.error(f"pedido_semanal error: {e}")
+        return {}

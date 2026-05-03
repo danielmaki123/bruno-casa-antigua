@@ -54,3 +54,22 @@ def cleanup(days: int = 30) -> None:
         logger.info(f"memory.cleanup: conversaciones anteriores a {cutoff.date()} eliminadas")
     except Exception as e:
         logger.error(f"memory.cleanup error: {e}")
+
+
+def get_recent(chat_id: int, limit: int = 5) -> list[dict]:
+    try:
+        rows = execute_query(
+            """
+            SELECT role, content, timestamp
+            FROM conversation_memory
+            WHERE chat_id = %s
+            ORDER BY timestamp DESC
+            LIMIT %s
+            """,
+            (chat_id, limit),
+            fetch=True,
+        )
+        return list(reversed([{"role": r["role"], "content": r["content"]} for r in (rows or [])]))
+    except Exception as e:
+        logger.error(f"memory.get_recent error: {e}")
+        return []
