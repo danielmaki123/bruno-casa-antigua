@@ -17,7 +17,8 @@ Analiza el mensaje y devuelve JSON con exactamente dos campos: "intent" y "entit
 
 Intents válidos:
 - sales_today: ventas del día actual ("ventas hoy", "cómo van las ventas")
-- sales_by_date: ventas de fecha o período específico ("ventas del martes", "ventas 28 abril", "ventas de ayer")
+- sales_by_date: ventas de una fecha específica ("ventas del martes", "ventas 28 abril", "ventas de ayer")
+- sales_by_month: ventas de un mes completo ("ventas de diciembre", "todo enero 2025", "resumen de marzo", "de todo el mes")
 - top_products: ranking de productos más vendidos ("top productos", "qué se vende más")
 - closing_status: consulta de cierre de caja ("cierre de ayer", "cómo salió el cierre")
 - stock_check: consulta de stock de producto o área ("/inventario", "stock bebidas", "cuánta cerveza hay")
@@ -26,11 +27,13 @@ Intents válidos:
 - help: ayuda o lista de comandos ("/help", "/ayuda")
 - unknown: cualquier otro mensaje
 
-Entities puede contener: date (SIEMPRE en formato ISO YYYY-MM-DD), product, area, quantity, period.
+Entities puede contener: date (ISO YYYY-MM-DD), year (int), month (int 1-12), product, area, quantity, period.
 IMPORTANTE: Resuelve fechas relativas usando la fecha de hoy ({today}). "ayer" = {yesterday}. "esta semana" = desde {week_start}.
+Para sales_by_month extrae year y month como enteros. "diciembre 2025" = year:2025, month:12. Si no hay año usa {year}.
 Responde SOLO con JSON válido, sin texto adicional.
 Ejemplos:
 {{"intent": "sales_by_date", "entities": {{"date": "{yesterday}"}}}}
+{{"intent": "sales_by_month", "entities": {{"year": 2025, "month": 12}}}}
 {{"intent": "stock_check", "entities": {{"product": "cerveza"}}}}
 {{"intent": "stock_report", "entities": {{"product": "coca cola", "quantity": 10, "action": "entry"}}}}
 """
@@ -65,6 +68,7 @@ def _classify_system() -> str:
         today=today.isoformat(),
         yesterday=yesterday.isoformat(),
         week_start=week_start.isoformat(),
+        year=today.year,
     )
 
 

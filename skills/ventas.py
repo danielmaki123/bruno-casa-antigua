@@ -45,6 +45,44 @@ def ventas_dia(fecha: str = None) -> dict:
         return {"error": str(e)}
 
 
+def ventas_mes(year: int, month: int) -> dict:
+    try:
+        rows = execute_query(
+            """
+            SELECT
+                fecha,
+                COALESCE(v_total, 0)             AS total,
+                COALESCE(efectivo_cds, 0)         AS efectivo,
+                COALESCE(tarjetas_total, 0)       AS tarjetas,
+                COALESCE(transferencias_total, 0) AS transferencias,
+                COALESCE(propina, 0)              AS propina,
+                COALESCE(num_facturas, 0)         AS tickets
+            FROM cierres_caja
+            WHERE EXTRACT(YEAR FROM fecha) = %s
+              AND EXTRACT(MONTH FROM fecha) = %s
+            ORDER BY fecha ASC
+            """,
+            (year, month),
+            fetch=True,
+        )
+        dias = [dict(r) | {"fecha": str(r["fecha"])} for r in (rows or [])]
+        total = sum(float(d.get("total", 0)) for d in dias)
+        propina = sum(float(d.get("propina", 0)) for d in dias)
+        tickets = sum(int(d.get("tickets", 0)) for d in dias)
+        return {
+            "year": year, "month": month,
+            "dias": len(dias),
+            "total_mes": total,
+            "propina_mes": propina,
+            "tickets_mes": tickets,
+            "detalle": dias,
+            "sin_datos": len(dias) == 0,
+        }
+    except Exception as e:
+        logger.error(f"ventas_mes error: {e}")
+        return {"error": str(e)}
+
+
 def ventas_semana() -> dict:
     try:
         rows = execute_query(

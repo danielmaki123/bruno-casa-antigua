@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 
 from telegram import Update
@@ -82,6 +83,12 @@ def _route(intent: str, entities: dict, chat_id: int, user_name: str = "") -> st
         fecha = entities.get("date") or entities.get("fecha")
         data = ventas.ventas_dia(fecha)
         return humanize(data, context=f"consulta de ventas para {fecha or 'hoy'}")
+
+    if intent == "sales_by_month":
+        year = int(entities.get("year") or dt.date.today().year)
+        month = int(entities.get("month") or dt.date.today().month)
+        data = ventas.ventas_mes(year, month)
+        return humanize(data, context=f"resumen mensual de ventas {month}/{year}")
 
     if intent == "top_products":
         rango = entities.get("period", "semana")
