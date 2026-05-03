@@ -1,4 +1,7 @@
+import base64
 import logging
+import os
+import tempfile
 import time
 
 from aiohttp import web
@@ -6,6 +9,7 @@ from aiohttp import web
 from bot.config import GROUP_ID_ADMIN, WEBHOOK_SECRET
 from bot.llm import humanize
 from skills import cierres, ventas
+from skills.parsers import parse_cierre_pdf, parse_ventas_pdf
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +53,62 @@ async def handle_cierre(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "documento_id": doc_id})
 
 
+async def handle_cierre_pdf(request: web.Request) -> web.Response:
+    if not _auth_ok(request):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "Invalid JSON"}, status=400)
+
+    attachments = body.get("attachments", [])
+    if not attachments:
+        return web.json_response({"error": "No attachments"}, status=400)
+
+    cierre_data = None
+    ventas_data = []
+
+    for att in attachments:
+        filename = att.get("filename", "").lower()
+        pdf_b64 = att.get("data", "")
+        try:
+            pdf_bytes = base64.b64decode(pdf_b64)
+        except Exception:
+            logger.warning(f"handle_cierre_pdf: base64 decode failed for {filename}")
+            continue
+
+        with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as f:
+            f.write(pdf_bytes)
+            tmp_path = f.name
+
+        try:
+            if "venta" in filename or "menu" in filename:
+                ventas_data = parse_ventas_pdf(tmp_path)
+                logger.info(f"Ventas PDF parsed: {len(ventas_data)} items")
+            else:
+                cierre_data = parse_cierre_pdf(tmp_path)
+                logger.info(f"Cierre PDF parsed: doc {cierre_data.get('documento_id')}")
+        except Exception as e:
+            logger.error(f"handle_cierre_pdf parse error ({filename}): {e}")
+        finally:
+            os.unlink(tmp_path)
+
+    if not cierre_data:
+        return web.json_response({"error": "No cierre PDF found or parse failed"}, status=400)
+
+    resultado = cierres.procesar_cierre_nuevo(cierre_data, ventas_data)
+
+    telegram_app = request.app["telegram_app"]
+    mensaje = humanize(resultado, context="nuevo cierre de caja procesado")
+    try:
+        await telegram_app.bot.send_message(chat_id=GROUP_ID_ADMIN, text=mensaje)
+    except Exception as e:
+        logger.error(f"handle_cierre_pdf send_message error: {e}")
+
+    return web.json_response({"ok": True, "documento_id": cierre_data.get("documento_id")})
+
+
 async def handle_sheets(request: web.Request) -> web.Response:
     if not _auth_ok(request):
         return web.json_response({"error": "Unauthorized"}, status=401)
@@ -84,6 +144,7 @@ def create_app(telegram_app) -> web.Application:
     app["telegram_app"] = telegram_app
     app.router.add_get("/health", handle_health)
     app.router.add_post("/webhook/cierre", handle_cierre)
+    app.router.add_post("/webhook/cierre/pdf", handle_cierre_pdf)
     app.router.add_post("/webhook/sheets", handle_sheets)
     app.router.add_get("/cron/resumen-semanal", handle_resumen_semanal)
     return app
