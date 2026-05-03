@@ -188,6 +188,37 @@ async def handle_sheets(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "synced": synced, "skipped": skipped, "fecha": sync_date})
 
 
+async def handle_stock_alerts(request: web.Request) -> web.Response:
+    if not _auth_ok(request):
+        return web.json_response({"error": "Unauthorized"}, status=401)
+
+    from skills import inventario as inv
+    from bot.llm import humanize
+    from bot.config import GROUP_ID_INVENTARIO
+
+    alertas = inv.check_alerts()
+    if not alertas:
+        logger.info("Stock alerts: todo ok, sin notificación")
+        return web.json_response({"ok": True, "alertas": 0})
+
+    criticos = [a for a in alertas if a.get("stock_actual", 0) == 0]
+    bajos = [a for a in alertas if a.get("stock_actual", 0) > 0]
+
+    mensaje = humanize(
+        {"alertas": alertas, "criticos": len(criticos), "bajos": len(bajos)},
+        context="alerta automática de stock bajo mínimo post-sincronización"
+    )
+
+    telegram_app = request.app["telegram_app"]
+    try:
+        await telegram_app.bot.send_message(chat_id=GROUP_ID_INVENTARIO, text=mensaje)
+        logger.info(f"Stock alerts enviado: {len(alertas)} productos ({len(criticos)} críticos)")
+    except Exception as e:
+        logger.error(f"handle_stock_alerts send_message error: {e}")
+
+    return web.json_response({"ok": True, "alertas": len(alertas), "criticos": len(criticos)})
+
+
 async def handle_resumen_semanal(request: web.Request) -> web.Response:
     logger.info("Cron /resumen-semanal disparado")
     data = ventas.ventas_semana()
@@ -210,5 +241,6 @@ def create_app(telegram_app) -> web.Application:
     app.router.add_post("/webhook/cierre", handle_cierre)
     app.router.add_post("/webhook/cierre/pdf", handle_cierre_pdf)
     app.router.add_post("/webhook/sheets", handle_sheets)
+    app.router.add_post("/webhook/stock-alerts", handle_stock_alerts)
     app.router.add_get("/cron/resumen-semanal", handle_resumen_semanal)
     return app
