@@ -36,8 +36,9 @@ Ejemplos:
 """
 
 _CURRENCY_NOTE = (
-    "\nIMPORTANTE: La moneda es Córdobas nicaragüenses (C$). Nunca uses MXN, USD ni ninguna otra moneda."
-    "\nFORMATO: Respuestas cortas, máximo 5 líneas. Usa saltos de línea para separar datos. Sin párrafos largos."
+    "\nIMPORTANTE: La moneda es Córdobas nicaragüenses (C$). Nunca uses $, MXN, USD ni ninguna otra moneda. Siempre escribe C$ antes del número."
+    "\nFORMATO: Respuestas cortas, máximo 6 líneas. Usa saltos de línea para separar datos. Sin párrafos largos."
+    "\nRESTRICCIONES: No inventes contexto, recordatorios, ni información que no esté en los datos. Solo responde con lo que está en los datos proporcionados."
 )
 
 
