@@ -2,10 +2,18 @@ import re
 from pypdf import PdfReader
 from datetime import datetime
 
+def _normalize(text: str) -> str:
+    # Replace non-newline whitespace (tabs, \xa0, thin spaces…) with regular space,
+    # then collapse runs of spaces. Keeps newlines so line-anchored patterns still work.
+    text = re.sub(r'[^\S\n]', ' ', text)
+    text = re.sub(r' +', ' ', text)
+    return text
+
+
 def parse_cierre_pdf(pdf_path):
     reader = PdfReader(pdf_path)
-    text = "\n".join([p.extract_text() or "" for p in reader.pages])
-    
+    text = _normalize("\n".join([p.extract_text() or "" for p in reader.pages]))
+
     def find_val(pattern, group=1):
         match = re.search(pattern, text)
         return match.group(group).replace(',', '').strip() if match else "0"
@@ -34,10 +42,8 @@ def parse_cierre_pdf(pdf_path):
 
 def parse_ventas_pdf(pdf_path):
     reader = PdfReader(pdf_path)
-    # Unimos el texto y normalizamos espacios para evitar cortes en nombres largos
     raw_text = " ".join([p.extract_text() or "" for p in reader.pages])
-    # Limpiamos el texto de saltos de línea dobles
-    clean_text = re.sub(r'\s+', ' ', raw_text)
+    clean_text = re.sub(r'\s+', ' ', _normalize(raw_text))
     
     items = []
     # Nuevo Regex: Cantidad (d+) -> Nombre (lo que sea hasta encontrar un precio) -> Precio (d.dd)

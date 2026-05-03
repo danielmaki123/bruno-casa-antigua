@@ -66,7 +66,9 @@ def main():
                 reader = PdfReader(tmp)
                 for i, page in enumerate(reader.pages):
                     text = page.extract_text() or ""
-                    print(f"--- Page {i+1} ---\n{text}")
+                    print(f"--- Page {i+1} (human) ---\n{text}")
+                    print(f"--- Page {i+1} (repr, first 800 chars) ---")
+                    print(repr(text[:800]))
             finally:
                 os.unlink(tmp)
 
