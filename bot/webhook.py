@@ -86,9 +86,11 @@ async def handle_cierre_pdf(request: web.Request) -> web.Response:
             if "venta" in filename or "menu" in filename:
                 ventas_data = parse_ventas_pdf(tmp_path)
                 logger.info(f"Ventas PDF parsed: {len(ventas_data)} items")
-            else:
+            elif cierre_data is None and "cierre" in filename:
                 cierre_data = parse_cierre_pdf(tmp_path)
                 logger.info(f"Cierre PDF parsed: doc {cierre_data.get('documento_id')}")
+            else:
+                logger.info(f"Skipping non-cierre PDF: {filename}")
         except Exception as e:
             logger.error(f"handle_cierre_pdf parse error ({filename}): {e}")
         finally:
