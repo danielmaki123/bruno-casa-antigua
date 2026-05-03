@@ -5,6 +5,7 @@ from aiohttp import web
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters
 
 from bot.config import TELEGRAM_BOT_TOKEN, WEBHOOK_PORT
+from scripts.db_migration_fase1 import run_migration
 from bot.handlers import (
     cmd_alertas,
     cmd_cierre,
@@ -23,8 +24,21 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _run_migration() -> None:
+    import os
+    import psycopg2
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        run_migration(conn)
+        conn.close()
+        logger.info("DB migration Fase 1 OK")
+    except Exception as e:
+        logger.error(f"DB migration error: {e}")
+
+
 async def main() -> None:
     logger.info("Bruno iniciando...")
+    _run_migration()
 
     telegram_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
