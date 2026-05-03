@@ -31,11 +31,22 @@ Entities puede contener: date (ISO YYYY-MM-DD), year (int), month (int 1-12), pr
 IMPORTANTE: Resuelve fechas relativas usando la fecha de hoy ({today}). "ayer" = {yesterday}. "esta semana" = desde {week_start}.
 Para sales_by_month extrae year y month como enteros. "diciembre 2025" = year:2025, month:12. Si no hay año usa {year}.
 Responde SOLO con JSON válido, sin texto adicional.
-Ejemplos:
-{{"intent": "sales_by_date", "entities": {{"date": "{yesterday}"}}}}
-{{"intent": "sales_by_month", "entities": {{"year": 2025, "month": 12}}}}
-{{"intent": "stock_check", "entities": {{"product": "cerveza"}}}}
-{{"intent": "stock_report", "entities": {{"product": "coca cola", "quantity": 10, "action": "entry"}}}}
+
+Ejemplos variados (lenguaje natural nicaragüense):
+"ventas de ayer" → {{"intent": "sales_by_date", "entities": {{"date": "{yesterday}"}}}}
+"cómo estamos hoy?" → {{"intent": "sales_today", "entities": {{}}}}
+"qué tal el sábado?" → {{"intent": "sales_by_date", "entities": {{"date": "<fecha del sábado pasado>"}}}}
+"cuánto vendimos en diciembre?" → {{"intent": "sales_by_month", "entities": {{"year": 2025, "month": 12}}}}
+"resumen de navidad" → {{"intent": "sales_by_month", "entities": {{"year": 2025, "month": 12}}}}
+"qué tal estuvo enero?" → {{"intent": "sales_by_month", "entities": {{"year": {year}, "month": 1}}}}
+"el mes pasado" → {{"intent": "sales_by_month", "entities": {{"year": <año correcto>, "month": <mes pasado>}}}}
+"top de la semana" → {{"intent": "top_products", "entities": {{"period": "semana"}}}}
+"qué se vendió más en agosto?" → {{"intent": "top_products", "entities": {{"period": "agosto"}}}}
+"cómo salió el cierre?" → {{"intent": "closing_status", "entities": {{}}}}
+"hay faltante?" → {{"intent": "closing_status", "entities": {{}}}}
+"cuánta toña hay?" → {{"intent": "stock_check", "entities": {{"product": "toña"}}}}
+"se acabó el vodka" → {{"intent": "stock_report", "entities": {{"product": "vodka", "quantity": 0, "action": "exit"}}}}
+"llegaron 2 cajas de cerveza" → {{"intent": "stock_report", "entities": {{"product": "cerveza", "quantity": 2, "action": "entry"}}}}
 """
 
 _CURRENCY_NOTE = (
