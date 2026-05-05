@@ -133,9 +133,11 @@ def _extract_pdfs(msg: dict) -> dict:
             fname = p.get("filename", "")
             if fname.lower().endswith(".pdf"):
                 aid = p.get("body", {}).get("attachmentId")
+                logger.info(f"PDF encontrado: '{fname}' | aid={bool(aid)}")
                 if aid:
                     if "cierre" in fname.lower(): found["cierre"] = (fname, aid)
                     elif "venta" in fname.lower() or "menu" in fname.lower(): found["ventas"] = (fname, aid)
+                    else: logger.warning(f"PDF sin clasificar: '{fname}'")
             if "parts" in p: walk_parts(p["parts"])
 
     payload = msg.get("payload", {})
