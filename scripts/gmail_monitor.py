@@ -38,6 +38,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("gmail_monitor")
 
+# Silenciar ruido de librerías externas
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("pypdf").setLevel(logging.ERROR)
+logging.getLogger("telegram").setLevel(logging.WARNING)
+logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
 # ── Config ────────────────────────────────────────────────────────────────────
 CHECK_INTERVAL   = int(os.getenv("GMAIL_CHECK_INTERVAL", "300"))
 SUBJECT_FILTER   = os.getenv("GMAIL_SUBJECT_FILTER", "Cierre de Caja")
@@ -133,7 +140,7 @@ def _extract_pdfs(msg: dict) -> dict:
             fname = p.get("filename", "")
             if fname.lower().endswith(".pdf"):
                 aid = p.get("body", {}).get("attachmentId")
-                logger.info(f"PDF encontrado: '{fname}' | aid={bool(aid)}")
+                logger.debug(f"PDF encontrado: '{fname}' | aid={bool(aid)}")
                 if aid:
                     if "venta_menu" in fname.lower(): found["ventas"] = (fname, aid)
                     elif "cierrepos" in fname.lower() or fname.lower().startswith("cierre"): found["cierre"] = (fname, aid)
