@@ -232,7 +232,7 @@ def _process_message(msg_id: str, processed: set):
             if "cierre" not in pdfs or "ventas" not in pdfs:
                 missing = [k for k in ("cierre", "ventas") if k not in pdfs]
                 logger.warning(f"Correo {msg_id} sin adjuntos requeridos: {missing} — no se marca procesado")
-                _notify_admin(f"⚠️ <b>Cierre incompleto</b>\nCorreo sin adjuntos: {missing}. Se reintentará en el próximo ciclo.")
+                _notify_admin(f"⚠️ <b>Cierre incompleto</b>\nID: {msg_id}\nCorreo sin adjuntos: {missing}. Se reintentará en el próximo ciclo.")
                 return
             try:
                 with tempfile.TemporaryDirectory() as tmpdir:
