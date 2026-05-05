@@ -53,6 +53,7 @@ _HELP = {
 _INTENT_PERM = {
     "sales_today": _financial_ok,
     "sales_by_date": _financial_ok,
+    "sales_by_month": _financial_ok,
     "top_products": _financial_ok,
     "closing_status": _financial_ok,
     "stock_check": _stock_ok,
@@ -112,6 +113,8 @@ def _route(intent: str, entities: dict, chat_id: int, user_name: str = "") -> st
             prod = result.get("producto", "")
             qty = result.get("cantidad_movimiento", 0)
             nuevo = result.get("stock_nuevo", 0)
+            if result.get("accion") == "query":
+                return f"📦 Stock actual de {prod}: {nuevo}"
             return f"✅ Registrado: {qty} {prod} — {user_name}. Stock actual: {nuevo}"
         return result.get("mensaje") or "⚠️ No pude registrar el movimiento."
 

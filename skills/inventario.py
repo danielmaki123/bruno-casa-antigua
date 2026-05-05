@@ -94,10 +94,11 @@ def registrar_movimiento(entities: dict, user_name: str) -> dict:
     entities: {product, quantity, action: 'entry'|'exit'|'waste'}
     """
     product_name = entities.get("product", "")
-    quantity = float(entities.get("quantity", 0))
+    quantity_raw = entities.get("quantity")
+    quantity = float(quantity_raw or 0)
     action = entities.get("action", "entry")
 
-    if not product_name or quantity <= 0:
+    if not product_name:
         return {"ok": False, "mensaje": "No pude entender el producto o la cantidad."}
 
     try:
@@ -126,6 +127,20 @@ def registrar_movimiento(entities: dict, user_name: str) -> dict:
             fetch=True,
         )
         current_qty = float(latest[0]["counted_qty"]) if latest else 0.0
+
+        if quantity_raw is None or quantity == 0:
+            return {
+                "ok": True,
+                "producto": product["name"],
+                "cantidad_movimiento": 0,
+                "accion": "query",
+                "stock_anterior": current_qty,
+                "stock_nuevo": current_qty,
+                "usuario": user_name,
+            }
+
+        if quantity < 0:
+            return {"ok": False, "mensaje": "No pude entender el producto o la cantidad."}
 
         if action == "entry":
             new_qty = current_qty + quantity

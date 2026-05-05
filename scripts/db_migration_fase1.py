@@ -21,6 +21,97 @@ if not DATABASE_URL:
     sys.exit(1)
 
 DDL = """
+CREATE TABLE IF NOT EXISTS cierres_caja (
+    id                      SERIAL PRIMARY KEY,
+    documento_id            VARCHAR(20)   NOT NULL UNIQUE,
+    fecha                   DATE          NOT NULL,
+    cajero                  VARCHAR(100),
+    terminal                VARCHAR(50),
+    factura_desde           VARCHAR(20),
+    factura_hasta           VARCHAR(20),
+    num_facturas            INT           DEFAULT 0,
+    facturas_anuladas       INT           DEFAULT 0,
+    apertura                TIMESTAMP,
+    cierre                  TIMESTAMP,
+    exonerado               NUMERIC(12,2) DEFAULT 0,
+    gravado                 NUMERIC(12,2) DEFAULT 0,
+    subtotal                NUMERIC(12,2) DEFAULT 0,
+    descuento               NUMERIC(12,2) DEFAULT 0,
+    iva                     NUMERIC(12,2) DEFAULT 0,
+    propina                 NUMERIC(12,2) DEFAULT 0,
+    v_total                 NUMERIC(12,2) DEFAULT 0,
+    efectivo_cds            NUMERIC(12,2) DEFAULT 0,
+    efectivo_usd            NUMERIC(12,2) DEFAULT 0,
+    tarjetas_total          NUMERIC(12,2) DEFAULT 0,
+    transferencias_total    NUMERIC(12,2) DEFAULT 0,
+    conteo_efectivo_cds     NUMERIC(12,2) DEFAULT 0,
+    conteo_efectivo_usd     NUMERIC(12,2) DEFAULT 0,
+    total_conteo_cds        NUMERIC(12,2) DEFAULT 0,
+    declaracion_pos         NUMERIC(12,2) DEFAULT 0,
+    apertura_custodio       NUMERIC(12,2) DEFAULT 0,
+    faltante                NUMERIC(12,2) DEFAULT 0,
+    sobrante                NUMERIC(12,2) DEFAULT 0,
+    diferencia_pos          NUMERIC(12,2) DEFAULT 0,
+    tipo_cambio             NUMERIC(8,4)  DEFAULT 0,
+    auditado                BOOLEAN       DEFAULT FALSE,
+    alerta_diferencia       BOOLEAN       DEFAULT FALSE,
+    alerta_faltante         BOOLEAN       DEFAULT FALSE,
+    notas_auditoria         TEXT,
+    created_at              TIMESTAMP     DEFAULT NOW(),
+    updated_at              TIMESTAMP     DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS ventas_detalle (
+    id              SERIAL PRIMARY KEY,
+    cierre_id       VARCHAR(20)   NOT NULL REFERENCES cierres_caja(documento_id) ON DELETE CASCADE,
+    fecha           DATE          NOT NULL,
+    categoria       VARCHAR(100),
+    descripcion     VARCHAR(200)  NOT NULL,
+    cantidad        INT           DEFAULT 0,
+    monto           NUMERIC(12,2) DEFAULT 0,
+    precio_unitario NUMERIC(12,2) GENERATED ALWAYS AS (
+        CASE WHEN cantidad > 0 THEN ROUND(monto / cantidad, 2) ELSE 0 END
+    ) STORED,
+    created_at      TIMESTAMP     DEFAULT NOW(),
+    UNIQUE (cierre_id, categoria, descripcion)
+);
+
+CREATE TABLE IF NOT EXISTS liquidaciones_banco (
+    id              SERIAL PRIMARY KEY,
+    fecha           DATE NOT NULL,
+    banco           VARCHAR(50) NOT NULL,
+    monto           NUMERIC(12,2) DEFAULT 0,
+    liquidacion_id  VARCHAR(100) NOT NULL,
+    raw_text        TEXT,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    UNIQUE (fecha, banco, liquidacion_id)
+);
+
+CREATE TABLE IF NOT EXISTS inventario_catalogo (
+    id SERIAL PRIMARY KEY,
+    producto VARCHAR(100) NOT NULL UNIQUE,
+    categoria VARCHAR(50),
+    unidad_tipo VARCHAR(20),
+    stock_minimo NUMERIC(10,3) DEFAULT 0,
+    proveedor_id INT,
+    activo BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS inventario_diario (
+    id SERIAL PRIMARY KEY,
+    fecha DATE NOT NULL,
+    producto_id INT REFERENCES inventario_catalogo(id),
+    cantidad_raw NUMERIC(10,3),
+    unidad_raw VARCHAR(20),
+    cantidad_normalizada NUMERIC(10,3),
+    responsable VARCHAR(100),
+    turno VARCHAR(20),
+    fuente VARCHAR(20) DEFAULT 'sheets',
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE (fecha, producto_id)
+);
+
 CREATE TABLE IF NOT EXISTS conversations (
     id         SERIAL PRIMARY KEY,
     chat_id    BIGINT NOT NULL,
@@ -69,6 +160,10 @@ CREATE TABLE IF NOT EXISTS inventory_counts (
 
 CREATE INDEX IF NOT EXISTS idx_conversations_chat ON conversations(chat_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_inventory_date     ON inventory_counts(date, area_id);
+CREATE INDEX IF NOT EXISTS idx_cierres_fecha      ON cierres_caja (fecha);
+CREATE INDEX IF NOT EXISTS idx_ventas_cierre_id   ON ventas_detalle (cierre_id);
+CREATE INDEX IF NOT EXISTS idx_liq_fecha_banco    ON liquidaciones_banco (fecha, banco);
+CREATE INDEX IF NOT EXISTS idx_inv_diario_fecha   ON inventario_diario(fecha);
 """
 
 AREAS = ["bebidas", "cocina", "barra", "sushi", "birria", "pizza"]

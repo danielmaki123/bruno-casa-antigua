@@ -94,7 +94,10 @@ def parse_cierre_pdf(pdf_path: str) -> Dict[str, Any]:
 
     # Tarjetas y transferencias
     tarjetas_total      = _num(_find(r"Total Tarjetas C\$\s*:\s*([\d,.\-]+)", text), context="Total Tarjetas")
-    transferencias_total = _num(_find(r"Total Ot\. Mtdos\s*:\s*([\d,.\-]+)\s+([\d,.\-]+)", text), context="Total Transferencias")
+    transferencias_total = _num(
+        _find(r"Total Ot\. Mtdos\s*:\s*([\d,.\-]+)\s+([\d,.\-]+)", text, group=2),
+        context="Total Transferencias",
+    )
 
     # Conteo de efectivo
     conteo_cds = _num(_find(r"Total Conteo Cordobas\s*:\s*([\d,.\-]+)", text), context="Conteo Físico Córdobas")

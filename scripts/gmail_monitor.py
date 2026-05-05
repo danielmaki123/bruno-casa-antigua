@@ -46,6 +46,8 @@ PROCESSED_FILE   = Path(os.getenv("PROCESSED_EMAILS_PATH", "data/processed_email
 DATABASE_URL     = os.getenv("DATABASE_URL")
 ADMIN_GROUP_ID   = os.getenv("GROUP_ID_ADMIN")
 BOT_TOKEN        = os.getenv("TELEGRAM_BOT_TOKEN")
+if not BOT_TOKEN:
+    BOT_TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 # Configuración de Bancos
 BANK_FILTERS = [
@@ -313,10 +315,6 @@ def main():
                 _notify_admin(f"🚑 <b>Crisis de Sistema</b>\nEl monitor ha fallado 3 veces seguidas. Error: {e}")
                 consecutive_errors = 0 # Reset para no spamear
         time.sleep(CHECK_INTERVAL)
-
-if __name__ == "__main__":
-    main()
-
 
 if __name__ == "__main__":
     main()

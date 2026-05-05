@@ -7,4 +7,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-CMD ["python", "-m", "bot.main"]
+RUN chmod +x scripts/start.sh
+
+CMD ["sh", "scripts/start.sh"]
