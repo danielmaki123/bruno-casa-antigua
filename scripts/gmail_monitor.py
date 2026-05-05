@@ -139,7 +139,10 @@ def _extract_pdfs(msg: dict) -> dict:
             if "parts" in p: walk_parts(p["parts"])
 
     payload = msg.get("payload", {})
-    if "parts" in payload: walk_parts(payload["parts"])
+    if "parts" in payload:
+        walk_parts(payload["parts"])
+    else:
+        walk_parts([payload])
     return found
 
 # ─── PDF Parsing ──────────────────────────────────────────────────────────────
