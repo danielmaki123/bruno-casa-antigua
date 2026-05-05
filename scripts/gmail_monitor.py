@@ -135,8 +135,8 @@ def _extract_pdfs(msg: dict) -> dict:
                 aid = p.get("body", {}).get("attachmentId")
                 logger.info(f"PDF encontrado: '{fname}' | aid={bool(aid)}")
                 if aid:
-                    if "cierre" in fname.lower(): found["cierre"] = (fname, aid)
-                    elif "venta" in fname.lower() or "menu" in fname.lower(): found["ventas"] = (fname, aid)
+                    if "venta" in fname.lower() or "menu" in fname.lower(): found["ventas"] = (fname, aid)
+                    elif "cierre" in fname.lower(): found["cierre"] = (fname, aid)
                     else: logger.warning(f"PDF sin clasificar: '{fname}'")
             if "parts" in p: walk_parts(p["parts"])
 
@@ -227,7 +227,7 @@ def _process_message(msg_id: str, processed: set):
         sender = headers.get('from', '')
 
         # 1. ¿Es un Cierre de Caja (POS)?
-        if SUBJECT_FILTER.lower() in subject.lower():
+        if SUBJECT_FILTER.lower() in subject.lower() and "pre cierre" not in subject.lower():
             pdfs = _extract_pdfs(msg)
             if "cierre" not in pdfs or "ventas" not in pdfs:
                 missing = [k for k in ("cierre", "ventas") if k not in pdfs]
