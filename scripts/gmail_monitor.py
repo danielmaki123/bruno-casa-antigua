@@ -222,7 +222,12 @@ def _process_message(msg_id: str, processed: set):
         # 1. ¿Es un Cierre de Caja (POS)?
         if SUBJECT_FILTER.lower() in subject.lower():
             pdfs = _extract_pdfs(msg)
-            if "cierre" in pdfs and "ventas" in pdfs:
+            if "cierre" not in pdfs or "ventas" not in pdfs:
+                missing = [k for k in ("cierre", "ventas") if k not in pdfs]
+                logger.warning(f"Correo {msg_id} sin adjuntos requeridos: {missing} — no se marca procesado")
+                _notify_admin(f"⚠️ <b>Cierre incompleto</b>\nCorreo sin adjuntos: {missing}. Se reintentará en el próximo ciclo.")
+                return
+            try:
                 with tempfile.TemporaryDirectory() as tmpdir:
                     c_fn, c_id = pdfs["cierre"]
                     v_fn, v_id = pdfs["ventas"]
@@ -231,7 +236,10 @@ def _process_message(msg_id: str, processed: set):
                     c_path.write_bytes(_get_attachment(msg_id, c_id))
                     v_path.write_bytes(_get_attachment(msg_id, v_id))
                     procesar_cierre(str(c_path), str(v_path))
-            processed.add(msg_id)
+                processed.add(msg_id)
+            except Exception as e:
+                logger.error(f"Error procesando cierre {msg_id}: {e} — no se marca procesado")
+                _notify_admin(f"⚠️ <b>Error procesando cierre</b>\n{e}. Se reintentará en el próximo ciclo.")
             return
 
         # 2. ¿Es una Liquidación Bancaria?

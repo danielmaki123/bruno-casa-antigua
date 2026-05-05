@@ -190,7 +190,7 @@ async def cmd_inventario(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     if not _stock_ok(chat_id):
         await update.message.reply_text("⚠️ Comando no disponible en este grupo.")
         return
-    area = context.args[0] if context.args else None
+    area = " ".join(context.args).strip() if context.args else None
     data = inventario.stock_check(area)
     response = humanize(data, context=f"stock de inventario{' - ' + area if area else ''}", chat_id=chat_id)
     await update.message.reply_text(response)
@@ -206,7 +206,7 @@ async def cmd_alertas(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
     if not _stock_ok(chat_id):
         await update.message.reply_text("⚠️ Comando no disponible en este grupo.")
         return
-    area = context.args[0] if context.args else None
+    area = " ".join(context.args).strip() if context.args else None
     alertas = inventario.check_alerts(area)
     response = humanize({"alertas": alertas, "area": area}, context="alertas de stock bajo mínimo", chat_id=chat_id)
     await update.message.reply_text(response)

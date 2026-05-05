@@ -26,8 +26,8 @@ Intents válidos:
 - stock_report: entrada o salida de inventario ("llegaron 10 cajas de coca", "se acabó el vodka")
 - stock_alerts: lista de alertas de stock bajo ("/alertas")
 - weekly_order: sugerencia de pedido semanal por proveedor ("pedido de la semana", "que hay que pedir", "pedido miercoles")
-- help: ayuda o lista de comandos ("/help", "/ayuda")
-- unknown: cualquier otro mensaje
+- help: ayuda o lista de comandos — SOLO si el usuario pide explícitamente ayuda o comandos ("/help", "/ayuda", "ayuda", "comandos", "qué podés hacer", "qué hacés")
+- unknown: cualquier otro mensaje — incluye saludos, preguntas conversacionales, afirmaciones, agradecimientos, preguntas sobre el sistema
 
 Entities puede contener: date (ISO YYYY-MM-DD), year (int), month (int 1-12), product, area, quantity, period.
 IMPORTANTE: Resuelve fechas relativas usando la fecha de hoy ({today}). "ayer" = {yesterday}. "esta semana" = desde {week_start}.
@@ -50,6 +50,10 @@ Ejemplos variados (lenguaje natural nicaragüense):
 "se acabó el vodka" → {{"intent": "stock_report", "entities": {{"product": "vodka", "quantity": 0, "action": "exit"}}}}
 "llegaron 2 cajas de cerveza" → {{"intent": "stock_report", "entities": {{"product": "cerveza", "quantity": 2, "action": "entry"}}}}
 "pedido de la semana" → {{"intent": "weekly_order", "entities": {{}}}}
+"hola" → {{"intent": "unknown", "entities": {{}}}}
+"gracias" → {{"intent": "unknown", "entities": {{}}}}
+"tenés acceso a la base de datos?" → {{"intent": "unknown", "entities": {{}}}}
+"qué tal?" → {{"intent": "unknown", "entities": {{}}}}
 """
 
 _CURRENCY_NOTE = (
@@ -86,6 +90,18 @@ def _classify_system() -> str:
     )
 
 
+_HELP_TRIGGERS = frozenset({"help", "ayuda", "comandos", "comando", "ayudame", "ayudá"})
+
+
+def _guard_help(intent: str, message: str) -> str:
+    if intent != "help":
+        return intent
+    words = set(message.lower().split())
+    if words & _HELP_TRIGGERS or message.strip().startswith("/"):
+        return intent
+    return "unknown"
+
+
 def classify_intent(message: str) -> dict:
     try:
         response = _client.chat.completions.create(
@@ -97,7 +113,9 @@ def classify_intent(message: str) -> dict:
             ],
         )
         raw = response.choices[0].message.content.strip()
-        return json.loads(raw)
+        result = json.loads(raw)
+        result["intent"] = _guard_help(result.get("intent", "unknown"), message)
+        return result
     except json.JSONDecodeError:
         logger.warning(f"classify_intent: JSON inválido de Kimi: {message!r}")
         return {"intent": "unknown", "entities": {}}
