@@ -264,6 +264,14 @@ def run_migration(conn):
             (product_id, area_id, min_qty, target_qty),
         )
 
+    # Limpieza única: borra cierres mal procesados (v_total=0) para que se reintenten
+    cur.execute("""
+        DELETE FROM cierres_caja WHERE v_total = 0
+    """)
+    deleted = cur.rowcount
+    if deleted > 0:
+        print(f"[DB] Cleanup: {deleted} cierre(s) con v_total=0 eliminados para reintento")
+
     conn.commit()
     cur.close()
 

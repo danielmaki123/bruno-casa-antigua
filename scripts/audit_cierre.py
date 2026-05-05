@@ -244,6 +244,7 @@ def procesar_cierre(cierre_pdf: str, ventas_pdf: str) -> dict:
     alertas = _auditar(cierre, ventas)
 
     # 3. Guardar en PostgreSQL
+    ya_existia = False
     if not DATABASE_URL:
         logger.warning("DATABASE_URL no configurado — saltando guardado en SQL")
     else:
@@ -251,21 +252,23 @@ def procesar_cierre(cierre_pdf: str, ventas_pdf: str) -> dict:
         if _ya_existe(conn, cierre["documento_id"]):
             logger.info(f"Cierre #{cierre['documento_id']} ya existe en DB — omitiendo")
             conn.close()
+            ya_existia = True
         else:
             _insertar_cierre(conn, cierre, alertas)
             _insertar_ventas(conn, ventas)
             conn.close()
             logger.info(f"Cierre #{cierre['documento_id']} guardado en PostgreSQL")
 
-    # 4. Enviar a Telegram Admin
-    mensaje = _build_mensaje(cierre, ventas, alertas)
-    mensaje_cat = _build_mensaje_categorias(cierre, ventas)
-    
-    if ADMIN_GROUP_ID:
-        ok1 = _telegram_send(ADMIN_GROUP_ID, mensaje)
-        # Enviamos las categorías como segundo mensaje para no saturar el primero
-        ok2 = _telegram_send(ADMIN_GROUP_ID, mensaje_cat)
-        logger.info(f"Telegram: Resumen={'enviado' if ok1 else 'error'} | Categorías={'enviado' if ok2 else 'error'}")
+    # 4. Enviar a Telegram Admin (solo si es nuevo — evita spam en re-procesamiento)
+    if not ya_existia:
+        mensaje = _build_mensaje(cierre, ventas, alertas)
+        mensaje_cat = _build_mensaje_categorias(cierre, ventas)
+        if ADMIN_GROUP_ID:
+            ok1 = _telegram_send(ADMIN_GROUP_ID, mensaje)
+            ok2 = _telegram_send(ADMIN_GROUP_ID, mensaje_cat)
+            logger.info(f"Telegram: Resumen={'enviado' if ok1 else 'error'} | Categorías={'enviado' if ok2 else 'error'}")
+    else:
+        mensaje = _build_mensaje(cierre, ventas, alertas)
 
     return {
         "documento_id": cierre["documento_id"],
