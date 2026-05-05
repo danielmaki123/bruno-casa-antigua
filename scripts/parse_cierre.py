@@ -208,6 +208,9 @@ def parse_ventas_pdf(pdf_path: str) -> List[Dict[str, Any]]:
                 "monto":       monto,
             })
 
+    if not ventas:
+        logger.warning(f"parse_ventas_pdf: lista de ventas vacia para {pdf_path}")
+
     return ventas
 
 

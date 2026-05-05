@@ -60,10 +60,10 @@ def get_recent(chat_id: int, limit: int = 5) -> list[dict]:
     try:
         rows = execute_query(
             """
-            SELECT role, content, timestamp
-            FROM conversation_memory
+            SELECT role, content, created_at
+            FROM conversations
             WHERE chat_id = %s
-            ORDER BY timestamp DESC
+            ORDER BY created_at DESC
             LIMIT %s
             """,
             (chat_id, limit),

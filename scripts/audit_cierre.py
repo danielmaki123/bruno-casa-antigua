@@ -71,6 +71,8 @@ def _ya_existe(conn, documento_id: str) -> bool:
 
 
 def _insertar_cierre(conn, cierre: dict, alertas: dict) -> None:
+    if float(cierre.get("v_total", 0) or 0) == 0:
+        raise ValueError("v_total es 0; se cancela insercion de cierre")
     cur = conn.cursor()
     cur.execute("""
         INSERT INTO cierres_caja (
@@ -90,6 +92,7 @@ def _insertar_cierre(conn, cierre: dict, alertas: dict) -> None:
             %(faltante)s, %(sobrante)s, %(diferencia_pos)s, %(tipo_cambio)s,
             TRUE, %(alerta_diferencia)s, %(alerta_faltante)s, %(notas_auditoria)s
         )
+        ON CONFLICT (documento_id) DO NOTHING
     """, {**cierre, **alertas})
     conn.commit()
     cur.close()

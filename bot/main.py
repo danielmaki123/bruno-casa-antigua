@@ -25,6 +25,32 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _fix_inventario_unique() -> None:
+    import os
+    import psycopg2
+    try:
+        conn = psycopg2.connect(os.environ["DATABASE_URL"])
+        conn.autocommit = True
+        cur = conn.cursor()
+        cur.execute("""
+            DELETE FROM inventario_diario a
+            USING inventario_diario b
+            WHERE a.fecha = b.fecha
+              AND a.producto_id = b.producto_id
+              AND a.id < b.id
+        """)
+        cur.execute("""
+            ALTER TABLE inventario_diario
+            ADD CONSTRAINT IF NOT EXISTS inventario_diario_fecha_producto_id_key
+            UNIQUE (fecha, producto_id)
+        """)
+        cur.close()
+        conn.close()
+        logger.info("inventario_diario: dedup + UNIQUE OK")
+    except Exception as e:
+        logger.error(f"inventario fix error: {e}")
+
+
 def _run_migration_v2() -> None:
     import os
     import psycopg2
@@ -52,6 +78,7 @@ async def main() -> None:
     logger.info("Bruno iniciando...")
     _run_migration()
     _run_migration_v2()
+    _fix_inventario_unique()
 
     telegram_app = ApplicationBuilder().token(TELEGRAM_BOT_TOKEN).build()
 
